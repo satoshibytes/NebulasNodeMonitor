@@ -8,7 +8,7 @@
  * Script requirements
  * ->Server must have PHP 5.6 or later installed installed
  * ->Server must have curl installed
- * ->chmod +x NebulasServicMonitor.php
+ * ->chmod +x NebulasServiceMonitor.php
  * execution: php NebulasServiceMonitor.php REQ
  * ->php NebulasServiceMonitor.php stopNeb
  * ->php NebulasServiceMonitor.php startNeb
@@ -73,7 +73,7 @@ class NebulasServiceMonitor extends NSMSettings
         } else if ($doThis == 'statusCheck') {//check the status of the node and intervene if necessary - This is the default action
             $this->statusCheck();
         } else if ($doThis == 'showStatus') {//check the status of the node but do not intervene
-
+            $this->showStatus();//TODO Make content pretty
         } else if ($doThis == 'killNeb' || $doThis == 'stopNeb') {
             $this->nodeProcId('kill');
             print_r($this->messages);
@@ -86,7 +86,6 @@ class NebulasServiceMonitor extends NSMSettings
 
     private function showStatus()
     {
-
         $nodeProcId = $this->nodeProcId();    //Get process id
         $serverStatus = $this->serverStatus();//Check load and mem usage
         $nodeStatus = $this->nodeStatusRPC();
@@ -97,7 +96,11 @@ class NebulasServiceMonitor extends NSMSettings
     {
         $load = sys_getloadavg();
         $memoryUsage = shell_exec("free");//Grab the current memory status
-        return array('load' => $load, 'memoryUsage' => $memoryUsage);
+        $this->messages = ['function' => 'serverStatus', 'messageRead' => "
+        Server Load: {$load}\n
+        Memory Usage: $memoryUsage", 'time' => time()];
+        //return array('load' => $load, 'memoryUsage' => $memoryUsage);
+
     }
 
     protected function nodeStatusRPC()//Check the node status via CURL request.
@@ -151,7 +154,9 @@ class NebulasServiceMonitor extends NSMSettings
             } else if (count($findNebProcExp) == 0) {
                 $this->status = 'offline';
             } else if ($req == 'procId') {
-                return $findNebProcExp;
+                //return $findNebProcExp;
+                $this->messages = ['function' => 'nodeProcId', 'messageRead' => "Neb Process ID: {$findNebProcExp}", 'result' => 'oneProcessFound', 'time' => time()];
+
             } else {
                 $this->status = 'online';
             }
@@ -163,7 +168,7 @@ class NebulasServiceMonitor extends NSMSettings
                 $this->messages = ['function' => 'nodeProcId', 'messageRead' => 'No neb process found', 'result' => 'markNodeAsOffline', 'time' => time()];
             }
         }
-        return null;
+       // return null;
     }
 
     private function killAllNeb($procList = null)//Kill all running neb processes via it's procid
@@ -190,6 +195,7 @@ class NebulasServiceMonitor extends NSMSettings
     {
         //Kill any existing processes
         $this->nodeProcId('kill');//Make sure all processes are terminated
+     /* Testing operation methods
         //shell_exec("source ~/.bashrc");
         //export LD_LIBRARY_PATH
         //  echo 'export LD_LIBRARY_PATH="' . $this->NSMSettings->goNebulasDirectory . '/native-lib"; ' . $this->NSMSettings->goNebulasDirectory;
@@ -199,16 +205,17 @@ class NebulasServiceMonitor extends NSMSettings
         //echo "--> export LD_LIBRARY_PATH={$this->NSMSettings->goNebulasDirectory}native-lib:\$LD_LIBRARY_PATH \n";
         // exec("export LD_LIBRARY_PATH={$this->NSMSettings->goNebulasDirectory}native-lib:\$LD_LIBRARY_PATH");+
         // echo 'export LD_LIBRARY_PATH=$CUR_DIR/native-lib:$LD_LIBRARY_PATH';
+       */
         putenv('export LD_LIBRARY_PATH=$CUR_DIR/native-lib:$LD_LIBRARY_PATH');
-        echo "\n-->" . NSMSettings::goNebulasDirectory . NSMSettings::nebStartServiceCommand . ' > /dev/null &' . "\n";
+      //  echo "\n-->" . NSMSettings::goNebulasDirectory . NSMSettings::nebStartServiceCommand . ' > /dev/null &' . "\n";
         exec(NSMSettings::goNebulasDirectory . NSMSettings::nebStartServiceCommand . ' > /dev/null &');//Execute startup command
         //echo "--> ./nebStart.sh " . $this->NSMSettings->nebStartServiceCommand . '&';
         //shell_exec("./nebStart.sh " . $this->NSMSettings->nebStartServiceCommand . '&');//Execute startup command
         sleep(NSMSettings::restartServiceDelayCheck);//wait for the node to come online before checking the status
         $maxRestartAttempts = NSMSettings::maxRestartAttempts;
         echo "\nEntered startNeb - Restart attempts: {$this->restartAttempts} | Max restart attempts: {$maxRestartAttempts}\n";
-        $this->nodeStatus();
-        echo 'Node status: ' . $this->status . "\n";
+        $this->nodeStatusRPC();
+       // echo 'Node status: ' . $this->status . "\n";
         if ($this->status == 'offline') {
             do {
                 $this->restartAttempts++;
@@ -216,13 +223,15 @@ class NebulasServiceMonitor extends NSMSettings
                 echo "\nStarting neb - Restart attempt: {$this->restartAttempts}\n";
                 if ($this->restartAttempts >= NSMSettings::maxRestartAttempts) {
                     $this->restart = false;
-                    echo "\n Restart failed - too many attempts.";
+                   // echo "\n Restart failed - too many attempts.";
+                    $this->messages = ['function' => 'startNeb', 'messageRead' => 'Restart failed - too many attempts.', 'result' => 'startNebFailed', 'time' => time()];
                 }
             } while ($this->restart === true);
         } else {
             $this->restart = false;
             $this->status = 'online';
-            echo "\n Neb is online - Restart attempt: {$this->restartAttempts}\n";
+            //echo "\n Neb is online - Restart attempt: {$this->restartAttempts}\n";
+            $this->messages = ['function' => 'startNeb', 'messageRead' => 'Neb is online', 'result' => 'startNebSuccess', 'time' => time()];
         }
     }
 
