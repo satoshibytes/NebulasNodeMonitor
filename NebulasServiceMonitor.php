@@ -27,12 +27,39 @@ class NebulasServiceMonitor extends NSMSettings
     public $about = array('version' => '0.1', 'name' => 'Nebulas Service Monitor', 'creator' => '@satoshiBytes', 'github' => '', 'avaiable actions' => "");//About this script
 
     //Define initial variables
+
     private $restart = false;//does the node need to be restarted - set initial to false
     private $restartAttempts = 0;//count how many restart attempts have been made
     private $messages = array();//store any messages from the processes
-    private $status = 'online';//if node is down, set to offline
-    private $synchronized = null;
-    private $blockHeight = null;
+    private $nodeStatus;//Can be online or offline
+    private $synchronized;//bool true or false
+    private $blockHeight;//Int synced block height.
+    private $serverLoad;//Server load stats
+    private $serverMemUtilization;//Server Memory utilization
+    private $statusLog;//Store the local log in a array
+
+    private function readWriteStatus($do = 'read')//store the current settings in a local file to verify the node is increasing block height.
+    {
+        /*
+         * What to store?
+         *  block height, previous status, last checked (timestamp)
+         */
+        if (!file_exists(NSMSettings::statusFilename)) {//Set the initial file
+            chmod(NSMSettings::statusFilename, 0755);
+            file_put_contents(NSMSettings::statusFilename, json_encode(array('')));
+        }
+        $statusLogArr = json_decode(file_get_contents(NSMSettings::statusFilename), true);//Need to get data reguardless
+
+        if ($do == 'read') {//Get the status from the file. Stored in JSON array.
+            $this->statusLog = $statusLogArr;
+        } else {//write to file
+            //New data
+            $result = array('restartRequested' => $this->restart, 'restartAttempts' => $this->restartAttempts,
+                'nodeStatus' => $this->nodeStatus, 'synchronized' => $this->synchronized, 'blockHeight' => $this->blockHeight,
+                'serverLoad' => $this->serverLoad, '$serverMemUtilization' => $this->serverMemUtilization, 'messages' => $this->messages,'endTime'=>time());
+
+        }
+    }
 
     private function statusCheck()//This is the primary monitor and restart function
     {
@@ -55,10 +82,24 @@ class NebulasServiceMonitor extends NSMSettings
          *      c) If block height is not restored to sync state after X attempts, restart the node.
          *4) Send report to external server for logging and contacting operator
          *      a) Once the server receives the log, it will decide to contact the op or to even startup a secondary node.
+         *
+         * Note: This function is what will decide if the node requires a restart.
+         *
+         * Additional feature: check block height vs other nodes.
+         *  Check hdd space on partition where blocks are located.
          */
-        $this->nodeStatusRPC();
+
+        //Get the overall status of the node.
         $this->nodeProcId();
         $this->serverStatus();
+        //First check if node is synced.
+        $this->nodeStatusRPC();
+        if ($this->synchronized == true) {//Node is online. Check server utilization
+
+        } else if ($this->synchronized == false) {//Check the local log to see if block height is increasing and compare it to the user defined variables to confirm synchronization is happening within a minimum speed.
+            $logStatusArr = $this->readWriteStatus('read');//Grab the local log
+
+        }
         if ($this->restart == true) {//nodeProcId found no running neb functions - restart the service
             $this->startNeb();
         }
@@ -74,14 +115,13 @@ class NebulasServiceMonitor extends NSMSettings
             $this->statusCheck();
         } else if ($doThis == 'showStatus') {//check the status of the node but do not intervene
             $this->showStatus();//TODO Make content pretty
-        } else if ($doThis == 'killNeb' || $doThis == 'stopNeb') {
+        } else if ($doThis == 'killNeb' || $doThis == 'stopNeb') {//Stops the node
             $this->nodeProcId('kill');
             print_r($this->messages);
-        } else if ($doThis == 'startNeb') {
+        } else if ($doThis == 'startNeb') {//Start the node
             $this->startNeb();
             print_r($this->messages);
         }
-
     }
 
     private function showStatus()
@@ -100,7 +140,6 @@ class NebulasServiceMonitor extends NSMSettings
         Server Load: {$load}\n
         Memory Usage: $memoryUsage", 'time' => time()];
         //return array('load' => $load, 'memoryUsage' => $memoryUsage);
-
     }
 
     protected function nodeStatusRPC()//Check the node status via CURL request.
@@ -113,26 +152,18 @@ class NebulasServiceMonitor extends NSMSettings
             $this->synchronized = $nodeStatusArray['result']['synchronized'];
             $this->blockHeight = $nodeStatusArray['result']['height'];
             $this->restart = false;
-            $this->status = 'online';
+            $this->nodeStatus = 'online';
             $this->messages = ['function' => 'nodeStatus', 'messageRead' => 'Node Online', 'time' => time()];
             if ($this->synchronized != true) {//Check the status file for the last recorded status
                 $this->messages = ['function' => 'nodeStatus', 'messageRead' => 'Node not synchronized', 'time' => time()];
             }
         } else {//No response from node - node is considered offline
             $this->restart = true;
-            $this->status = 'offline';
+            $this->nodeStatus = 'offline';
             $this->messages = ['function' => 'nodeStatus', 'messageRead' => 'Node offline', 'time' => time()];
         }
     }
 
-    private function readWriteStatus($do = 'read')//store the current settings in a local file to verify the node is increasing block height.
-    {
-        if ($do == 'read') {//Get the status from the file. Stored in JSON array.
-
-        } else {//write to file
-
-        }
-    }
 
     private function nodeProcId($req = null)//Find the process id on the server and verify that there is only one process running (not counting children).
     {
@@ -152,23 +183,22 @@ class NebulasServiceMonitor extends NSMSettings
                 //    $this->messages = ['function' => 'nodeProcId', 'messageRead' => 'manual kill requested', 'result' => '', 'time' => time()];
                 $this->killAllNeb($findNebProcExp);
             } else if (count($findNebProcExp) == 0) {
-                $this->status = 'offline';
+                $this->nodeStatus = 'offline';
             } else if ($req == 'procId') {
                 //return $findNebProcExp;
                 $this->messages = ['function' => 'nodeProcId', 'messageRead' => "Neb Process ID: {$findNebProcExp}", 'result' => 'oneProcessFound', 'time' => time()];
 
             } else {
-                $this->status = 'online';
+                $this->nodeStatus = 'online';
             }
         } else {//No process found
             if ($req === 'kill') {
                 $this->messages = ['function' => 'nodeProcId', 'messageRead' => 'Manual kill requested but node not running', 'result' => 'killReqButNodeOffline', 'time' => time(), 'custom' => "REQ: $req"];
             } else {
-                $this->status = 'offline';
+                $this->nodeStatus = 'offline';
                 $this->messages = ['function' => 'nodeProcId', 'messageRead' => 'No neb process found', 'result' => 'markNodeAsOffline', 'time' => time()];
             }
         }
-       // return null;
     }
 
     private function killAllNeb($procList = null)//Kill all running neb processes via it's procid
@@ -183,8 +213,8 @@ class NebulasServiceMonitor extends NSMSettings
                 $thisProcId = $thisProcExp[1];
                 shell_exec("kill $thisProcId");
             }
-            $this->restart = true;
-            $this->status = 'offline';
+            //$this->restart = true;
+            $this->nodeStatus = 'offline';
             $this->messages = ['function' => 'killAllNeb', 'messageRead' => 'neb killed - number of processes: ' . count($procList), 'result' => 'nebTerminated', 'time' => time()];
         } else {
             $this->messages = ['function' => 'killAllNeb', 'messageRead' => 'Unknown data passed', 'result' => 'unknownData', 'time' => time()];
@@ -195,19 +225,19 @@ class NebulasServiceMonitor extends NSMSettings
     {
         //Kill any existing processes
         $this->nodeProcId('kill');//Make sure all processes are terminated
-     /* Testing operation methods
-        //shell_exec("source ~/.bashrc");
-        //export LD_LIBRARY_PATH
-        //  echo 'export LD_LIBRARY_PATH="' . $this->NSMSettings->goNebulasDirectory . '/native-lib"; ' . $this->NSMSettings->goNebulasDirectory;
-        //$test = shell_exec('export LD_LIBRARY_PATH="' . $this->NSMSettings->goNebulasDirectory . '/native-lib"; ' . $this->NSMSettings->goNebulasDirectory);
-        //shell_exec('export LD_LIBRARY_PATH="' . $this->NSMSettings->goNebulasDirectory . '/native-lib;"');
-        //export LD_LIBRARY_PATH=$CUR_DIR/native-lib:$LD_LIBRARY_PATH
-        //echo "--> export LD_LIBRARY_PATH={$this->NSMSettings->goNebulasDirectory}native-lib:\$LD_LIBRARY_PATH \n";
-        // exec("export LD_LIBRARY_PATH={$this->NSMSettings->goNebulasDirectory}native-lib:\$LD_LIBRARY_PATH");+
-        // echo 'export LD_LIBRARY_PATH=$CUR_DIR/native-lib:$LD_LIBRARY_PATH';
-       */
+        /* Testing operation methods
+           //shell_exec("source ~/.bashrc");
+           //export LD_LIBRARY_PATH
+           //  echo 'export LD_LIBRARY_PATH="' . $this->NSMSettings->goNebulasDirectory . '/native-lib"; ' . $this->NSMSettings->goNebulasDirectory;
+           //$test = shell_exec('export LD_LIBRARY_PATH="' . $this->NSMSettings->goNebulasDirectory . '/native-lib"; ' . $this->NSMSettings->goNebulasDirectory);
+           //shell_exec('export LD_LIBRARY_PATH="' . $this->NSMSettings->goNebulasDirectory . '/native-lib;"');
+           //export LD_LIBRARY_PATH=$CUR_DIR/native-lib:$LD_LIBRARY_PATH
+           //echo "--> export LD_LIBRARY_PATH={$this->NSMSettings->goNebulasDirectory}native-lib:\$LD_LIBRARY_PATH \n";
+           // exec("export LD_LIBRARY_PATH={$this->NSMSettings->goNebulasDirectory}native-lib:\$LD_LIBRARY_PATH");+
+           // echo 'export LD_LIBRARY_PATH=$CUR_DIR/native-lib:$LD_LIBRARY_PATH';
+          */
         putenv('export LD_LIBRARY_PATH=$CUR_DIR/native-lib:$LD_LIBRARY_PATH');
-      //  echo "\n-->" . NSMSettings::goNebulasDirectory . NSMSettings::nebStartServiceCommand . ' > /dev/null &' . "\n";
+        //  echo "\n-->" . NSMSettings::goNebulasDirectory . NSMSettings::nebStartServiceCommand . ' > /dev/null &' . "\n";
         exec(NSMSettings::goNebulasDirectory . NSMSettings::nebStartServiceCommand . ' > /dev/null &');//Execute startup command
         //echo "--> ./nebStart.sh " . $this->NSMSettings->nebStartServiceCommand . '&';
         //shell_exec("./nebStart.sh " . $this->NSMSettings->nebStartServiceCommand . '&');//Execute startup command
@@ -215,21 +245,21 @@ class NebulasServiceMonitor extends NSMSettings
         $maxRestartAttempts = NSMSettings::maxRestartAttempts;
         echo "\nEntered startNeb - Restart attempts: {$this->restartAttempts} | Max restart attempts: {$maxRestartAttempts}\n";
         $this->nodeStatusRPC();
-       // echo 'Node status: ' . $this->status . "\n";
-        if ($this->status == 'offline') {
+        // echo 'Node status: ' . $this->status . "\n";
+        if ($this->nodeStatus == 'offline') {
             do {
                 $this->restartAttempts++;
                 $this->startNeb();
                 echo "\nStarting neb - Restart attempt: {$this->restartAttempts}\n";
                 if ($this->restartAttempts >= NSMSettings::maxRestartAttempts) {
                     $this->restart = false;
-                   // echo "\n Restart failed - too many attempts.";
+                    // echo "\n Restart failed - too many attempts.";
                     $this->messages = ['function' => 'startNeb', 'messageRead' => 'Restart failed - too many attempts.', 'result' => 'startNebFailed', 'time' => time()];
                 }
             } while ($this->restart === true);
         } else {
             $this->restart = false;
-            $this->status = 'online';
+            $this->nodeStatus = 'online';
             //echo "\n Neb is online - Restart attempt: {$this->restartAttempts}\n";
             $this->messages = ['function' => 'startNeb', 'messageRead' => 'Neb is online', 'result' => 'startNebSuccess', 'time' => time()];
         }

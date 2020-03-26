@@ -49,5 +49,9 @@ class NSMSettings
     protected const maxRestartAttempts = 8;
 //Set the neb listening port
     protected const  nebListenPort = '8685';
-
+//Set the status filename
+    protected const  statusFilename = 'NebulasServiceMonitor.status';
+    //How many events to store locally. This includes messages, block height, etc... in a JSON array.
+    // Minimum is 1 so to check that block height is increasing.
+    protected const  eventsToStoreLocally = 100;
 }
