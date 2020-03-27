@@ -54,10 +54,14 @@ class NebulasServiceMonitor extends NSMSettings
             $this->statusLog = $statusLogArr;
         } else {//write to file
             //New data
-            $result = array('restartRequested' => $this->restart, 'restartAttempts' => $this->restartAttempts,
+            $currentStatus[time()] = array('restartRequested' => $this->restart, 'restartAttempts' => $this->restartAttempts,
                 'nodeStatus' => $this->nodeStatus, 'synchronized' => $this->synchronized, 'blockHeight' => $this->blockHeight,
-                'serverLoad' => $this->serverLoad, '$serverMemUtilization' => $this->serverMemUtilization, 'messages' => $this->messages,'endTime'=>time());
-
+                'serverLoad' => $this->serverLoad, '$serverMemUtilization' => $this->serverMemUtilization, 'messages' => $this->messages);
+            $NewLog = $currentStatus + $this->statusLog;
+            if (count($NewLog) >= NSMSettings::eventsToStoreLocally) {//See if the array has more inputs than requested
+                $NewLog = array_pop($NewLog);
+            }
+            file_put_contents(NSMSettings::statusFilename, json_encode($NewLog));//Store the log
         }
     }
 
@@ -91,23 +95,35 @@ class NebulasServiceMonitor extends NSMSettings
 
         //Get the overall status of the node.
         $this->nodeProcId();
+        //Get the server hardware status
         $this->serverStatus();
         //First check if node is synced.
         $this->nodeStatusRPC();
-        if ($this->synchronized == true) {//Node is online. Check server utilization
+        //Get the historical log status.
+        $logStatusArr = $this->readWriteStatus('read');
 
-        } else if ($this->synchronized == false) {//Check the local log to see if block height is increasing and compare it to the user defined variables to confirm synchronization is happening within a minimum speed.
-            $logStatusArr = $this->readWriteStatus('read');//Grab the local log
+        if ( $this->nodeStatus=='online'){//Node is running
+            if ($this->synchronized == true) {//Node is online. Check server utilization
+
+            } else if ($this->synchronized == false) {//Check the local log to see if block height is increasing and
+                // compare it to the user defined variables to confirm synchronization is happening within a minimum speed.
+
+            }
+        }else{//Node is offline
 
         }
+
         if ($this->restart == true) {//nodeProcId found no running neb functions - restart the service
             $this->startNeb();
         }
+        $this->readWriteStatus('write');//Write the data to the local log
+
     }
 
     public function doProcess($doThis)//This are the available actions.
     {
         if ($doThis == 'about') {//print the about section
+
             print_r($this->about);
         } else if ($doThis == 'showSettings') {//print all the settings
             print_r(get_defined_constants(true));
