@@ -122,6 +122,7 @@ class NebulasServiceMonitor extends NSMSettings
 
     public function doProcess($doThis)//This are the available actions.
     {
+
         if ($doThis == 'about') {//print the about section
             print_r($this->about);
         } else if ($doThis == 'showSettings') {//print all the settings
