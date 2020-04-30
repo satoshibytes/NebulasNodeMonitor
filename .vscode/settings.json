@@ -1,0 +1,8 @@
+{
+    "githubPullRequests.remotes": [
+        "origin",
+        "upstream",
+        "push",
+        "pull"
+    ]
+}
