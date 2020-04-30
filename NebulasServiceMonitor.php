@@ -13,7 +13,7 @@
  * ->php NebulasServiceMonitor.php stopNeb
  * ->php NebulasServiceMonitor.php startNeb
  */
-//test
+//--//
 
 if (isset($argv[1])) {//&& $argv[2] == 'fromBash'
 	print_r($argv);
