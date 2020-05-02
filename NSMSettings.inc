@@ -32,10 +32,10 @@ class NSMSettings
 	protected const delayBetweenReports = 600;
 
 	//If the service is not found, should we restart the service?
-	protected const  restartService = true;//true or false
+	protected const  restartService = true; //true or false
 
 	//If there are multiple neb processes found, stop and restart them.
-	protected const restartServiceIfMultipleProcFound = true;//true or false
+	protected const restartServiceIfMultipleProcFound = true; //true or false
 
 	//How long in seconds to wait to verify the process restarted
 	protected const restartServiceDelayCheck = 10;
@@ -64,4 +64,8 @@ class NSMSettings
 	//How many events to store locally. This includes messages, block height, etc... in a JSON array.
 	// Minimum is 1 so to check that block height is increasing.
 	protected const  eventsToStoreLocally = 100;
+
+	//Get current block height from external source
+	protected const externalApiURL = 'https://mainnet.nebulas.io';
+
 }

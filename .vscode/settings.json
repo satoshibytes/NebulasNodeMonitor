@@ -1,8 +1,12 @@
-{	
-    "githubPullRequests.remotes": [	
-        "origin",	
-        "upstream",	
-        "push",	
-        "pull"	
-    ]	
-} 
+{
+    "githubPullRequests.remotes": [
+        "origin",
+        "upstream",
+        "push",
+        "pull"
+    ],
+    "editor.wordWrap": "on",
+    "files.associations": {
+        "*.inc": "php"
+    }
+}
