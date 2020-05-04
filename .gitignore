@@ -2,3 +2,5 @@
  .gitignore
  .logs/
  .private
+.vscode/sftp.json
+.vscode/settings.json
