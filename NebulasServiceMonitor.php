@@ -51,6 +51,7 @@ class NebulasServiceMonitor extends NSMSettings
 	private $localLogStatus; //Store the local log in a array
 	private $synchronizedBehindCount; //Variable to store how long a node has been behind
 	private $externalNebState; //Store the nebstate from external API
+
 	private function readWriteLog($do = 'read')
 	{   //store the current settings in a local file to verify the node status
 		if (!file_exists(NSMSettings::statusFilename)) { //Set the initial file
@@ -93,8 +94,9 @@ class NebulasServiceMonitor extends NSMSettings
 		/*
 		 * Steps:
 		 * 1) Check to see if there is a response from the node
-		 *      a) Response good and in sync
-		 *          i) Check resource usage. If resources exceed specified, restart the node and/or notify operator. Submit data to website.
+		 *      a) Response good.
+		 * 			i) get external api block height and compare it with local height. If height does not match or is greater than 1 (due to block time gen), report a error.
+		 *          ii) Check resource usage. If resources exceed specified, restart the node and/or notify operator. Submit data to website.
 		 *      b) Response good but not in sync
 		 *          i) Check to see if the node is syncing up based on the previously recorded height.
 		 *          ii) If height is not increasing, trigger restart.
@@ -107,7 +109,7 @@ class NebulasServiceMonitor extends NSMSettings
 		 *      a) Store the latest X number of attempts in the local log.
 		 *      b) If block height is not increasing, restart the node again
 		 *      c) If block height is not restored to sync state after X attempts, restart the node.
-		 *4) Send report to external server for logging and contacting operator
+		 *4) Send report to external server for logging and contact node admin
 		 *      a) Once the server receives the log, it will decide to contact the op or to even startup a secondary node.
 		 *
 		 * Note: This function is what will decide if the node requires a restart.
@@ -124,7 +126,23 @@ class NebulasServiceMonitor extends NSMSettings
 		$this->readWriteLog('read');
 
 		if ($this->nodeStatus == 'online') { //Node is running
+			$externalNebStateBlockHeight =	$this->externalNebState['result']['height'];
+			$externalNebStateSynchronized =	$this->externalNebState['result']['synchronized'];
 			if ($this->synchronized == true) { //Node is online. Check server utilization
+				//Compare block height to the api
+				if ($externalNebStateSynchronized == true) {
+					//In case of block being generated during check, allow for a 1 block tolerance
+					$acceptableHeight = [$this->externalNebState['result']['height'] - 1, $this->externalNebState['result']['height'], $this->externalNebState['result']['height'] + 1];
+					if (!in_array($this->nodeBlockHeight, $acceptableHeight)) { //Block heights do not match local vs external - we will not restart on this error 
+						//TODO make it a option)
+						$this->messages = [
+							'function' => 'statusCheck',
+							'messageRead' => "The node is reporting to be synced.",
+							'result' => 'success',
+							'time' => time()
+						];
+					}
+				}
 				$this->synchronizedBehindCount = 0; //Set the count to 0 for the current log status
 				$this->messages = [
 					'function' => 'statusCheck',
@@ -188,12 +206,10 @@ class NebulasServiceMonitor extends NSMSettings
 			//See if the node is online and if so, terminate it.
 			$this->nodeProcId('kill');
 		}
-
 		if ($this->restart == true) { //nodeProcId found no running neb functions - restart the service
 			$this->startNeb();
 		}
 		$this->readWriteLog('write'); //Write the data to the local log
-
 	}
 
 	public function doProcess($doThis) //This are the available actions.
@@ -256,11 +272,19 @@ class NebulasServiceMonitor extends NSMSettings
 
 	private function getExternalAPIData($type = '/v1/user/nebstate')
 	{ //Get the block height from a external source
-		// /v1/user/nebstate
+		// /v1/user/nebstate - standard call
 		$externalURL = NSMSettings::externalApiURL . $type;
-		$nodeStatus = shell_exec("curl -H 'Content-Type: application/json' -X GET $externalURL");
-		$this->externalNebState = json_decode($nodeStatus, true);
+		$apiResult = shell_exec("curl -H 'Content-Type: application/json' -X GET $externalURL");
+		$externalNebStateArray = json_decode($apiResult, true);
 		if (json_last_error() == JSON_ERROR_NONE) { //API data successfully retrieved. 
+			$this->externalNebState =	$externalNebStateArray;
+		} else {
+			$this->messages = [
+				'function' => 'getExternalAPIData',
+				'messageRead' => "Error obtaining API data from $externalURL",
+				'time' => time()
+			];
+			$this->externalNebState = null;
 		}
 	}
 
