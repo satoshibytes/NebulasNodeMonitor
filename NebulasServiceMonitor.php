@@ -4,7 +4,6 @@
  * This script was created to monitor the status of a Nebulas node.
  * It should work as-is on all modern Debian (Ubuntu, etc...) based systems (have not tested on RHEL (should work) or BSD (probably needs some modifications) as of yet).
  *
- * 
  * Be sure to set your configuration in the NebulasServiceMonitorSettings.inc file.
  * Script requirements
  * ->Server must have PHP 5.6 or later installed installed
@@ -13,6 +12,7 @@
  * execution: php NebulasServiceMonitor.php REQ
  * ->php NebulasServiceMonitor.php stopNeb
  * ->php NebulasServiceMonitor.php startNeb
+ *
  */
 //--//
 
@@ -29,14 +29,14 @@ $NebulasServiceMonitor->doProcess($doProcess);
 
 class NebulasServiceMonitor extends NSMSettings
 {
-	public $about = [
+	public $about = [//About this script
 		'version' => '0.1',
 		'name' => 'Nebulas Service Monitor',
 		'creator' => '@SatoshiBytes',
 		'warning' => 'Work in progress and experimental - do not use on a live node server',
 		'github' => 'https://github.com/satoshibytes/NebulasNodeMonitor/',
 		'available actions' => "To be added..."
-	]; //About this script
+	];
 
 	//Define initial variables
 	private $restart = false; //does the node need to be restarted - set initial to false

@@ -5,7 +5,6 @@
  * Simply set the config below for your specific needs
  * Required php to be installed on server (sudo apt install php7.3-cli)
  * Required curl (sudo apt install curl)
- * 
  */
 
 class NSMSettings
