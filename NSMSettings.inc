@@ -7,11 +7,10 @@
  * Required curl (sudo apt install curl)
  */
 
-class NSMSettings
+class NSMSettings extends NebulasServiceMonitor
 {
 	//Where should reports be sent
 	protected const reportTo = '';
-
 	/*
 	 * If the node is behind in blocks and is not synced based on local rpc, when should it be restarted.
 	 * For example:
@@ -48,7 +47,7 @@ class NSMSettings
 	protected const goNebulasDirectory = '/home/neb/go-nebulas/';
 
 	//The startup command along with what config to use.
-	protected const nebStartServiceCommand = 'neb -c mainnet/conf/config.conf';
+	protected const nebStartServiceCommand = 'neb -c testnet/conf/config.conf';
 	// public $nebStartConfigFile = 'mainnet/conf/config.conf';
 	// public $nebProcName = 'neb';
 
@@ -67,5 +66,4 @@ class NSMSettings
 
 	//Get current block height from external source
 	protected const externalApiURL = 'https://mainnet.nebulas.io';
-
 }
