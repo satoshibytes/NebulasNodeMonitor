@@ -6,7 +6,7 @@
  *
  * Be sure to set your configuration in the NebulasServiceMonitorSettings.inc file.
  * Script requirements
- * ->Server must have PHP 7 (possibly 5.6) or later installed (apt install php-cli)
+ * ->Server must have PHP 7 (possibly 5.6) or later installed (apt install php-cli php-curl)
  * ->Server must have curl installed
  * ->chmod +x NebulasServiceMonitor.php
  * execution: php NebulasServiceMonitor.php REQ
@@ -374,15 +374,48 @@ class NebulasServiceMonitor
 		}
 	}
 
+	protected function curlRequest($url, $timeout = 5)
+	{
+		$ch = curl_init();
+		$curlOptions = [CURLOPT_URL            => $url, CURLOPT_HEADER => false,
+		                CURLOPT_TIMEOUT        => $timeout,
+		                CURLOPT_CONNECTTIMEOUT => $timeout,
+		                CURLOPT_RETURNTRANSFER => true];
+		curl_setopt_array($ch, $curlOptions);
+
+		$data = curl_exec($ch);
+
+		if (curl_errno($ch)) {
+			$this->messages[] = [
+				'function'    => 'curlRequest',
+				'messageRead' => 'Curl request failed. URL: ' . $url,
+				'result'      => 'error',
+				'time'        => time()
+			];
+			$status = 'error';
+			$this->nodeStatus = 'offline';
+		} else {//Successful response
+			$status = 'success';
+			$this->nodeStatus = 'online';
+		}
+		curl_close($ch);//close curl
+		return ['status' => $status, 'data' => $data];
+	}
+
 	protected function nodeStatusRPC() //Check the node status via CURL request.
 	{
 		$port = NSMSettings::nebListenPort;
-		$nodeStatus = shell_exec("curl -H 'Content-Type: application/json' -X GET http://localhost:{$port}/v1/user/nebstate");
-		//$nodeStatusJson = json_decode($nodeStatus, true);
-		if (json_last_error() == JSON_ERROR_NONE) { //Node is online - let's check the status
+		$curlRequest = $this->curlRequest("http://localhost:{$port}/v1/user/nebstate");
+		if ($curlRequest['status'] == 'success') {
+			$nodeStatus = json_decode($curlRequest['data'], true);
+			$this->nodeStatus = 'offline';
+		}
+		if (json_last_error() == JSON_ERROR_NONE && $this->nodeStatus == 'online') { //Node is online - lets check the status
 			$nodeStatusArray = json_decode($nodeStatus, true);
+			//print_r($nodeStatusArray);
 			$this->synchronized = $nodeStatusArray['result']['synchronized'];
 			$this->nodeBlockHeight = $nodeStatusArray['result']['height'];
+			echo "---$this->synchronized---\n";
 			$this->restart = false;
 			$this->nodeStatus = 'online';
 			$this->messages[] = [
@@ -391,7 +424,7 @@ class NebulasServiceMonitor
 				'result'      => 'success',
 				'time'        => time()
 			];
-			if ($this->synchronized != true) { //Check the status file for the last recorded status
+			if ($this->synchronized !== true) { //Check the status file for the last recorded status
 				$this->messages[] = [
 					'function'    => 'nodeStatusRPC',
 					'messageRead' => 'Node not synchronized',
@@ -402,17 +435,17 @@ class NebulasServiceMonitor
 		} else { //No response from node - node is considered offline
 			//$this->restart = true;
 			$this->nodeStatus = 'offline';
-			$this->messages[] = [
-				'function'    => 'nodeStatusRPC',
-				'messageRead' => 'Node offline',
-				'result'      => 'error',
-				'time'        => time()
-			];
+			$this->messages[] = ['function'    => 'nodeStatusRPC',
+			                     'messageRead' => 'Node offline',
+			                     'result'      => 'error',
+			                     'time'        => time()];
 		}
+
 		return null;//Results stored in pre-defined variables
 	}
 
-	private function nodeProcId($req = null)
+	private
+	function nodeProcId($req = null)
 	{ //Find the process id on the server and verify that there is only one process running (not counting children).
 		$findNebProcGrep = '[' . NSMSettings::nebStartServiceCommand[0] . ']' .
 			substr(NSMSettings::nebStartServiceCommand, 1); //Set the search string
@@ -477,7 +510,8 @@ class NebulasServiceMonitor
 		return null;//Results stored in pre-defined variables
 	}
 
-	private function killAllNeb($procList = null)
+	private
+	function killAllNeb($procList = null)
 	{//Kill all running neb processes via it's procId
 		if (!$procList || $procList == 'kill') { //If we do not receive any info, grab the procId and continue
 			$procList = $this->nodeProcId('procId');
@@ -509,7 +543,8 @@ class NebulasServiceMonitor
 		}
 	}
 
-	private function startNeb() //Start the neb service
+	private
+	function startNeb() //Start the neb service
 	{
 		//Kill any existing processes - Make sure all processes are terminated
 		$this->nodeProcId('kill');
@@ -524,7 +559,7 @@ class NebulasServiceMonitor
 		   // exec("export LD_LIBRARY_PATH={$this->NSMSettings->goNebulasDirectory}native-lib:\$LD_LIBRARY_PATH");+
 		   // echo 'export LD_LIBRARY_PATH=$CUR_DIR/native-lib:$LD_LIBRARY_PATH';
 				//  echo "\n-->" . NSMSettings::goNebulasDirectory . NSMSettings::nebStartServiceCommand . ' > /dev/null &' . "\n";
-//echo "--> ./nebStart.sh " . $this->NSMSettings->nebStartServiceCommand . '&';
+	//echo "--> ./nebStart.sh " . $this->NSMSettings->nebStartServiceCommand . '&';
 		//shell_exec("./nebStart.sh " . $this->NSMSettings->nebStartServiceCommand . '&');//Execute startup command
 		  */
 		putenv('export LD_LIBRARY_PATH=$CUR_DIR/native-lib:$LD_LIBRARY_PATH');//Set evn variables for .neb
@@ -564,7 +599,8 @@ class NebulasServiceMonitor
 		}
 	}
 
-	private function reportData($settings)
+	private
+	function reportData($settings)
 	{
 		if (NSMSettings::reportTo == 'externalWebsite') {
 		} else if (NSMSettings::reportTo == 'email') {
