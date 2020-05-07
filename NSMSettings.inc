@@ -11,6 +11,23 @@ class NSMSettings extends NebulasServiceMonitor
 {
 	//Where should reports be sent
 	protected const reportTo = '';
+
+	//Server limits before triggering errors
+	//The minimum amount of free ram available before triggering a error. For example if set to 20, the minimum amount of free ram must be 20%.
+	protected const minFreeMemoryPercent = '20';
+	//The minimum amount of free swap space available before triggering a error. For example if set to 20, the minimum amount of free ram must be 20%.
+	protected const minFreeSwapPercent = '20';
+	//Max 5 minute load before triggering a error. Basically, max load should be under your core count. For example with 8 cores, this should be a max of 7 but is not set in stone. Can be a decimal such as 4.5   //todo implement improved features with cat /proc/cpuinfo
+	protected const maxLoad5Minutes = '3.5';
+
+	//When to restart node
+	//Restart node if we run out of minimum ram
+	protected const restartMinFreeMemoryPercent = true;
+	//Restart node if we run out of swap space
+	protected const restartMinFreeSwapPercent = true;
+	//Restart node if max load is reached
+	protected const restartMaxLoad5MinuteAvg = true;
+	protected const restartIfMaxLoadExceeded = true;
 	/*
 	 * If the node is behind in blocks and is not synced based on local rpc, when should it be restarted.
 	 * For example:
