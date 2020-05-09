@@ -79,7 +79,7 @@ class NSMSettings extends NebulasServiceMonitor
 
 	//How many events to store locally. This includes messages, block height, etc... in a JSON array.
 	// Minimum is 1 so to check that block height is increasing.
-	protected const  eventsToStoreLocally = 100;
+	protected const  eventsToStoreLocally = 6;
 
 	//Get current block height from external source
 	protected const externalApiURL = 'https://mainnet.nebulas.io';
