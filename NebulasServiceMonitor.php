@@ -1,5 +1,4 @@
 <?php
-
 /*
  * This script was created to monitor the status of a Nebulas node.
  * It should work as-is on all modern Debian (Ubuntu, etc...) based systems (have not tested on RHEL (should work) or BSD (probably needs some modifications) as of yet).
@@ -7,6 +6,7 @@
  * Be sure to set your configuration in the NebulasServiceMonitorSettings.inc file.
  * Script requirements
  * ->Server must have PHP 7 (possibly 5.6) or later installed (apt install php-cli php-curl)
+ * ->the file NebulasServiceMonitor.php and neb need to be owned by the same users (for some systems, it may be required to change who php runs as or give sudo access)//TODO check permission services
  * ->Server must have curl installed
  * ->chmod +x NebulasServiceMonitor.php
  * execution: php NebulasServiceMonitor.php REQ
@@ -22,9 +22,8 @@ if (isset($argv[1])) { //&& $argv[2] == 'fromBash'
 	$doProcess = 'about';
 }
 //Include the settings
-
-//Call the class
 require_once "NSMSettings.inc";
+//Call the class
 $NebulasServiceMonitor = new NebulasServiceMonitor();
 //Do a process as defined via command line4
 $NebulasServiceMonitor->doProcess($doProcess);
@@ -46,7 +45,7 @@ class NebulasServiceMonitor
 	private $synchronizedBehindCount; //Variable to store how long a node has been behind
 	private $externalNebState; //Store the nebstate from external API
 
-	public $about = [//About this script
+	public $about = [//About
 	                 'version'            => '0.1',
 	                 'name'               => 'Nebulas Service Monitor',
 	                 'creator'            => '@SatoshiBytes',
@@ -67,36 +66,38 @@ class NebulasServiceMonitor
 		//Default is to read but can specify write.
 
 		if (!file_exists(NSMSettings::statusFilename)) { //Set the initial file if it does not exist
+			file_put_contents(NSMSettings::statusFilename, json_encode([time()]));
 			chmod(NSMSettings::statusFilename, 0755);
-			file_put_contents(NSMSettings::statusFilename, json_encode(['']));
 		}
 		$statusLogArr = json_decode(file_get_contents(NSMSettings::statusFilename), true); //Need to get data regardless
 		if ($do == 'read') { //Get the status from the file. Stored in JSON array.
 			$this->statusLog = $statusLogArr;
 			$this->localLogStatus = $statusLogArr[0]; //Store only the last results of the log in a var to access in other locations.
+
 			/*
 			 * Get last block height: $this->statusLogLastResult['blockHeight']
 			 * Get last reported timestamp(epoch time): $this->statusLogLastResult['reportTime']
 			 * Get last sync result: $this->statusLogLastResult['synchronized']
 			 */
 		} else { //write to file
-			$currentStatus = [//New data to add to the log
-			                  'restartRequested'        => $this->restart,
-			                  'restartAttempts'         => $this->restartAttempts,
-			                  'nodeStatus'              => $this->nodeStatus,
-			                  'synchronized'            => $this->synchronized,
-			                  'synchronizedBehindCount' => $this->synchronizedBehindCount,
-			                  'blockHeight'             => $this->nodeBlockHeight,
-			                  'serverLoad'              => $this->serverLoad,//todo set this variable
-			                  '$serverMemUtilization'   => $this->serverMemUtilization,
-			                  'messages'                => $this->messages,
-			                  'reportTime'              => time(),
-			                  'ExternalAPIStatus'       => $this->externalNebState
-			];
-			$NewLog = $currentStatus + $this->statusLog;//append to the log with the max number of events to store.
+			echo "Entered write log \n";
+			$NewLog = [//New data to add to the log
+			           'restartRequested'        => $this->restart,
+			           'restartAttempts'         => $this->restartAttempts,
+			           'nodeStatus'              => $this->nodeStatus,
+			           'synchronized'            => $this->synchronized,
+			           'synchronizedBehindCount' => $this->synchronizedBehindCount,
+			           'blockHeight'             => $this->nodeBlockHeight,
+			           'serverHWUtilization'     => $this->serverHWUtilization,
+			           'messages'                => $this->messages,
+			           'reportTime'              => time(),
+			           'ExternalAPIStatus'       => $this->externalNebState,
+			           'statusLog'               => $this->statusLog
+				] + $this->statusLog;
 			if (count($NewLog) >= NSMSettings::eventsToStoreLocally) { //See if the array has more inputs than requested
 				$NewLog = array_pop($NewLog);
 			}
+			print_r($NewLog);
 			file_put_contents(NSMSettings::statusFilename, json_encode($NewLog)); //Store the log
 		}
 	}
@@ -129,7 +130,7 @@ class NebulasServiceMonitor
 		 * Additional feature: check block height vs other nodes.
 		 *  Check hdd space on partition where blocks are located.
 		 */
-
+		echo "Entered statusCheck\n";
 		//Get the server hardware status
 		$this->serverStatus();
 		//First check if node is synced.
@@ -217,6 +218,7 @@ class NebulasServiceMonitor
 				}
 			}
 		} else { //Node is offline - find a procId, kill it and mark as restart required.
+			echo "Entered node restart\n";
 			$this->restart = true;
 			//See if the node is online and if so, terminate it.
 			$this->nodeProcId('kill');
@@ -224,6 +226,7 @@ class NebulasServiceMonitor
 		if ($this->restart == true) { //nodeProcId found no running neb functions - restart the service
 			$this->startNeb();
 		}
+		echo "Hit write";
 		$this->readWriteLog('write'); //Write the data to the local log
 	}
 
@@ -243,11 +246,11 @@ class NebulasServiceMonitor
 					} else {
 						if ($doThis == 'killNeb' || $doThis == 'stopNeb') { //Stops the node
 							$this->nodeProcId('kill');
-							print_r($this->messages);
+							//	print_r($this->messages);
 						} else {
 							if ($doThis == 'startNeb') { //Start the node
 								$this->startNeb();
-								print_r($this->messages);
+								//print_r($this->messages);
 							}
 						}
 					}
@@ -294,6 +297,7 @@ class NebulasServiceMonitor
 		$memoryUsageArrayUnclean = explode("\n", $memoryUsageRaw);//convert data into array
 		$memoryUsageArrayUnclean = array_filter($memoryUsageArrayUnclean);
 		$memoryUsageArray = $memoryUsageDataArray = [];//Set array
+
 		foreach ($memoryUsageArrayUnclean as $val) {//Clean spaces
 			$val = ltrim($val);
 			$memoryUsageArray[] = $val;
@@ -359,10 +363,18 @@ class NebulasServiceMonitor
 	{ //Get the block height from a external source
 		// /v1/user/nebstate - standard call
 		$externalURL = NSMSettings::externalApiURL . $type;
-		$apiResult = shell_exec("curl -H 'Content-Type: application/json' -X GET $externalURL");
-		$externalNebStateArray = json_decode($apiResult, true);
+		$curlRequest = $this->curlRequest($externalURL, $timeout = 10);
+		if ($curlRequest['status'] == 'success') {
+			$externalNebStateArray = json_decode($curlRequest['data'], true);
+		}
 		if (json_last_error() == JSON_ERROR_NONE) { //API data successfully retrieved.
 			$this->externalNebState = $externalNebStateArray;
+			$this->messages[] = [
+				'function'    => 'getExternalAPIData',
+				'messageRead' => "External API block height: {$externalNebStateArray['result']['height']}",
+				'result'      => 'info',
+				'time'        => time()
+			];
 		} else {
 			$this->messages[] = [
 				'function'    => 'getExternalAPIData',
@@ -406,25 +418,25 @@ class NebulasServiceMonitor
 	{
 		$port = NSMSettings::nebListenPort;
 		$curlRequest = $this->curlRequest("http://localhost:{$port}/v1/user/nebstate");
+		//print_r($curlRequest);
 		if ($curlRequest['status'] == 'success') {
-			$nodeStatus = json_decode($curlRequest['data'], true);
-			$this->nodeStatus = 'offline';
+			$nodeStatusArray = json_decode($curlRequest['data'], true);
+			$this->nodeStatus = 'online';
 		}
 		if (json_last_error() == JSON_ERROR_NONE && $this->nodeStatus == 'online') { //Node is online - lets check the status
-			$nodeStatusArray = json_decode($nodeStatus, true);
-			//print_r($nodeStatusArray);
+			//$nodeStatusArray = json_decode($nodeStatus, true);
+			//var_dump($nodeStatusArray);
 			$this->synchronized = $nodeStatusArray['result']['synchronized'];
 			$this->nodeBlockHeight = $nodeStatusArray['result']['height'];
-			echo "---$this->synchronized---\n";
 			$this->restart = false;
 			$this->nodeStatus = 'online';
 			$this->messages[] = [
 				'function'    => 'nodeStatusRPC',
-				'messageRead' => 'Node Online',
+				'messageRead' => "Node Online. Block height: {$nodeStatusArray['result']['height']}",
 				'result'      => 'success',
 				'time'        => time()
 			];
-			if ($this->synchronized !== true) { //Check the status file for the last recorded status
+			if ($this->synchronized != true) { //Check the status file for the last recorded status
 				$this->messages[] = [
 					'function'    => 'nodeStatusRPC',
 					'messageRead' => 'Node not synchronized',
@@ -440,19 +452,23 @@ class NebulasServiceMonitor
 			                     'result'      => 'error',
 			                     'time'        => time()];
 		}
-
 		return null;//Results stored in pre-defined variables
 	}
 
-	private
-	function nodeProcId($req = null)
+	private function nodeProcId($req = null)
 	{ //Find the process id on the server and verify that there is only one process running (not counting children).
-		$findNebProcGrep = '[' . NSMSettings::nebStartServiceCommand[0] . ']' .
-			substr(NSMSettings::nebStartServiceCommand, 1); //Set the search string
+		$findNebProcGrep = '[' . NSMSettings::nebStartServiceCommand[0] . ']' . substr(NSMSettings::nebStartServiceCommand, 1); //Set the search string
+		//$findNebProcCommand = NSMSettings::nebStartServiceCommand;
 		$findNebProc = shell_exec("ps -ux | grep \"$findNebProcGrep\""); //Find the .neb process based on the $settings['restartServiceCommand'] setting
+		echo "\n-- ps -ux | grep \"$findNebProcGrep\" --\n";
 		if ($findNebProc) { //Process found
 			$findNebProcExp = explode('\n', $findNebProc); //Break down the results by line (ps -ux | grep "[n]eb -c mainnet/conf/config.conf")
 			if (count($findNebProcExp) > 1) { //Multiple processes found - should only be one
+				/*foreach ($findNebProcExp as $this) {
+					$thisClean = preg_replace('/[ ]{2,}/', ' ', $this);//clean double spaces
+					$thisExp = explode(' ', $thisClean);
+					$procIdList = [$thisExp[1]];
+				}*/
 				$this->messages[] = [
 					'function'    => 'nodeProcId',
 					'messageRead' => 'Multiple Neb processes found',
@@ -464,6 +480,10 @@ class NebulasServiceMonitor
 					$this->killAllNeb($findNebProcExp);
 				}
 			} else {
+				//Get single procid
+				/*	$findNebProcExp = preg_replace('/[ ]{2,}/', ' ', $findNebProcExp);//clean double spaces
+					$findNebProcExp = explode(' ', $findNebProcExp);
+					$procIdList = [$findNebProcExp[1]];*/
 				if ($req == 'kill') {
 					//    $this->messages[] = ['function' => 'nodeProcId', 'messageRead' => 'manual kill requested', 'result' => '', 'time' => time()];
 					$this->killAllNeb($findNebProcExp);
@@ -510,19 +530,22 @@ class NebulasServiceMonitor
 		return null;//Results stored in pre-defined variables
 	}
 
-	private
-	function killAllNeb($procList = null)
+	private function killAllNeb($procList = null)
 	{//Kill all running neb processes via it's procId
+		echo "entered killAllNeb\n";
 		if (!$procList || $procList == 'kill') { //If we do not receive any info, grab the procId and continue
 			$procList = $this->nodeProcId('procId');
 		}
 		if (is_array($procList)) { //Expecting array (even if it's just one process to kill)
 			foreach ($procList as $thisProc) {
-				$thisProcExp = preg_split('/\s+/', $thisProc);
-				$thisProcId = $thisProcExp[1];
-				shell_exec("kill $thisProcId");
+				echo $thisProc;
+				$thisProc = preg_replace('/[ ]{2,}/', ' ', $thisProc);//clean double spaces
+				$thisProcExp = explode(' ', $thisProc);
+				echo "\n test - kill {$thisProcExp[1]} --\n";
+				shell_exec("kill {$thisProcExp[1]}");
 			}
 			//$this->restart = true;
+
 			$this->nodeStatus = 'offline';
 			$this->messages[] = [
 				'function'    => 'killAllNeb',
@@ -543,8 +566,7 @@ class NebulasServiceMonitor
 		}
 	}
 
-	private
-	function startNeb() //Start the neb service
+	private function startNeb() //Start the neb service
 	{
 		//Kill any existing processes - Make sure all processes are terminated
 		$this->nodeProcId('kill');
@@ -599,11 +621,13 @@ class NebulasServiceMonitor
 		}
 	}
 
-	private
-	function reportData($settings)
+	private function reportData($settings)
 	{
 		if (NSMSettings::reportTo == 'externalWebsite') {
-		} else if (NSMSettings::reportTo == 'email') {
+
+		}
+		if (NSMSettings::reportTo == 'email') {
+
 		}
 	}
 }
