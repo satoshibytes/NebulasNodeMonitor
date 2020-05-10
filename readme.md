@@ -10,12 +10,13 @@ Currently, the program will check:
 * Local storage of node verification status;
 * Start/Restart a node based on conditions (such as node offline, excessive memory usage, etc...);
 * Send emails when intervention was necessary;
-* Settings can be configured via the commented NSMSettings.inc file.
+
+__Settings can be configured via the commented NSMSettings.inc file.__
 
 ## Requirements ##
-* The server must have php7.2 and php-curl installed
-* The status is checked via a cron job 
-* The file NebulasServiceMonitor.php must be the same user as the neb file so it can start and stop the program. 
+* The server must have php7.2 and php-curl installed.
+* The status is checked via a cron job.
+* The file NebulasServiceMonitor.php must be the same user as the neb file so it can start and stop the program.
 
 ## Installation ##
 Thus far, testing has been via a Debian based server running PHP 7.2. It should work with other base operating systems as well such as Ubuntu (based on Debian) and CentOS.
@@ -37,10 +38,18 @@ _Note: /path/to/go-nebulas/ must be the actual path to your go-nebulas install. 
 * Simpler installer.
 
 ### This is still a work in progress ###
-This repo is a work in progress and I am still working on the code and testing. It's not ready for real world usage at the moment. 
-In the future, I would like to support notifications via Telegram & email as well as a web-based GUI with stored node stats.
+This repo is a work in progress and I am still working on the code and testing. It's not ready for real world usage at the moment. In the future, I would like to support notifications via Telegram & email as well as a web-based GUI with stored node stats. 
+
+If used in a live environment, you can set the option to disable server restarts so it will only observe the system.
 
 ### License ###
-The software licensed as __Creative Commons Attribution (BY)__. Feel free to use in any environment, edit (PR are welcome) and share. I just ask that you leave the "creator" information in the file.
+Copyright 2020 @SatoshiBytes
 
-Original version made by @SatoshiBytes https://github.com/satoshibytes/NebulasNodeMonitor
+Permission is hereby granted, free of charge, to any person obtaining a copy of this software and associated documentation files (the "Software"), to deal in the Software without restriction, including without limitation the rights to use, copy, modify, merge, publish, distribute, sublicense, and/or sell copies of the Software, and to permit persons to whom the Software is furnished to do so, subject to the following conditions:
+
+The above copyright notice and this permission notice shall be included in all copies or substantial portions of the Software.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
+
+Original version published at https://github.com/satoshibytes/NebulasNodeMonitor
+

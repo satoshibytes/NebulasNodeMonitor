@@ -20,10 +20,9 @@
  */
 
 if (isset($argv[1])) { //&& $argv[2] == 'fromBash'
-    print_r($argv);
     $doProcess = $argv[1];
 } else {
-    $doProcess = 'about';
+    $doProcess = 'statusCheck';
 }
 //Include the settings
 require_once "NSMSettings.inc";
@@ -44,11 +43,11 @@ class NebulasServiceMonitor
     private $nodeBlockHeight; //Current node block height
     //   private $serverLoad; //Current server load stats as array
     private $serverHWUtilization; //Current server hardware utilization as array
-    private $statusLog; //Store the local log in a array
-    private $localLogStatus; //Store the local log in a array
+    private $localLogHistory; //Store the local log in a array
+    private $localLogLastCall; //Store the local log in a array
     private $synchronizedBehindCount; //Variable to store how long a node has been behind
     private $externalNebState; //Store the nebstate from external API
-    private $updatedLog;//
+    private $localLogLatest;//
     public $about = [//About
                      'version' => '0.1',
                      'name' => 'Nebulas Service Monitor',
@@ -62,7 +61,8 @@ class NebulasServiceMonitor
                                               'killNeb' => 'Kills the process - cal alternatively use stopNeb',
                                               'startNeb' => 'Checks to see if the node is running then starts the node up if not.',
                                               'nodeStatus' => 'Check to see if the node is synchronized',
-                                              'readLog' => 'Read the local log message']
+                                              'readLog' => 'Read the local log message',
+                                              'eraseLog' => 'Delete the log file']
     ];
 
     public function doProcess($doThis) //This are the available actions.
@@ -70,7 +70,11 @@ class NebulasServiceMonitor
         switch ($doThis) {
             case 'readLog':
                 $this->readWriteLog('read');
-                print_r($this->statusLog);//maybe set it to read the entire log
+                print_r($this->localLogHistory);//maybe set it to read the entire log
+                break;
+            case 'eraseLog':
+                $this->readWriteLog('erase');
+                print_r($this->localLogHistory);//Erase the log
                 break;
             case'showSettings':
                 print_r(get_defined_constants(true));
@@ -198,12 +202,12 @@ class NebulasServiceMonitor
                 }
             } else {
                 //The node is reporting not being synced.
-                $this->synchronizedBehindCount = $this->localLogStatus['synchronizedBehindCount'] + 1; //Increase the count
+                $this->synchronizedBehindCount = $this->localLogLastCall['synchronizedBehindCount'] + 1; //Increase the count
 
                 //Check the local log to see if block height is increasing and compare it to the user defined variables to confirm synchronization is happening within a minimum speed and if the node was synced last check.
-                if ($this->localLogStatus['synchronized'] == false) {//The last check resulted in a failed synchronized result. Let's see if the block height is increasing at a proper rate.
+                if ($this->localLogLastCall['synchronized'] == false) {//The last check resulted in a failed synchronized result. Let's see if the block height is increasing at a proper rate.
                     //First see if the height increased at all
-                    if ($this->localLogStatus['blockHeight'] == $this->nodeBlockHeight) {//The block height did not increase.
+                    if ($this->localLogLastCall['blockHeight'] == $this->nodeBlockHeight) {//The block height did not increase.
                         $this->messages[] = [
                             'function' => 'statusCheck',
                             'messageRead' => "The block height did not increase from the last check. Setting restart required to true.",
@@ -214,8 +218,8 @@ class NebulasServiceMonitor
                     } else { //The block height did increase - let's see if its within acceptable rate
                         //What is the minimum amount of blocks generated we should accept.
                         $minBlocksGen = (NSMSettings::delayBetweenReports / 15) + ((NSMSettings::delayBetweenReports / 15) * (NSMSettings::nodeSyncMinBlockCountIncreasePercentage / 100));//TODO look at this line closer
-                        $blockHeightIncreaseCount = $this->localLogStatus['blockHeight'] + $minBlocksGen;
-                        echo "--$minBlocksGen-- | $blockHeightIncreaseCount --\n ";
+                        $blockHeightIncreaseCount = $this->localLogLastCall['blockHeight'] + $minBlocksGen;
+                        //echo "--$minBlocksGen-- | $blockHeightIncreaseCount --\n ";
                         if ($this->nodeBlockHeight < $blockHeightIncreaseCount) {
                             //Block height increasing too slowly
                             $this->messages[] = [
@@ -233,10 +237,10 @@ class NebulasServiceMonitor
                                 'time' => time()
                             ];
                         }
-                        if ($blockHeightIncreaseCount >= NSMSettings::nodeBehindRestartCount) { //The node is behind for the max amount of checks
+                        if ($blockHeightIncreaseCount < NSMSettings::nodeBehindRestartCount) { //The node is behind for the max amount of checks
                             $this->messages[] = [
                                 'function' => 'statusCheck',
-                                'messageRead' => "The node is behind for the max amount of checks. Setting restart required to true.",
+                                'messageRead' => "The node is behind for the max amount of checks. Setting restart required to true. Local Height: $this->nodeBlockHeight,| External Height: {$this->externalNebState['result']['height']}",
                                 'result' => 'error',
                                 'time' => time()
                             ];
@@ -266,48 +270,82 @@ class NebulasServiceMonitor
     private function showStatus()
     {//Show the status of the node when called
         $this->nodeProcId();    //Get process id
+        echo "completed nodeProcId\n";
         $this->serverStatus(); //Check load and mem usage
+        echo "completed serverStatus\n";
+
         $this->nodeStatusRPC();//Get the node status via RPC req
+        echo "completed nodeStatusRPC\n";
+
     }
 
     private function readWriteLog($do = 'read')
     {   //Store the current settings in a local file to verify the node status/
-        //Default is to read but can specify write.
-        if (!file_exists(NSMSettings::statusFilename)) { //Set the initial file if it does not exist
-            file_put_contents(NSMSettings::statusFilename, json_encode([time()]));
-            chmod(NSMSettings::statusFilename, 0755);
+        //Default is to read but can specify write and erase.
+        if ($do == 'erase') {
+            unlink(NSMSettings::localLogFile);
+        } else if ($do == 'writeInitial') {
+            $this->showStatus();
+            $this->localLogLatest[] = [//New data to add to the log
+                                       'restartRequested' => $this->restart,
+                                       'restartAttempts' => $this->restartAttempts,
+                                       'nodeStatus' => $this->nodeStatus,
+                                       'synchronized' => $this->synchronized,
+                                       'synchronizedBehindCount' => $this->synchronizedBehindCount,
+                                       'blockHeight' => $this->nodeBlockHeight,
+                                       'serverHWUtilization' => $this->serverHWUtilization,
+                                       'reportTime' => time(),
+                                       'ExternalAPIStatus' => $this->externalNebState,
+                                       'messages' => $this->messages];
+            file_put_contents(NSMSettings::localLogFile, json_encode($this->localLogLatest)); //Store the log
+            chmod(NSMSettings::localLogFile, 0755);
+            echo "Entered writeInitial\n";
+            $do = 'write';
         }
-        $statusLogArr = json_decode(file_get_contents(NSMSettings::statusFilename), true); //Need to get data regardless
-        if ($do == 'read') { //Get the status from the file. Stored in JSON array.
-            $this->statusLog = $statusLogArr;
-            $this->localLogStatus = $statusLogArr[0]; //Store only the last results of the log in a var to access in other locations.
 
+        if (!file_exists(NSMSettings::localLogFile)) { //Set the initial file if it does not exist
+            $this->readWriteLog('writeInitial');
+        }
+        //Get the log file
+        $statusLogArr = json_decode(file_get_contents(NSMSettings::localLogFile), true); //Need to get data regardless
+        echo "Grabbed log file.\n";
+
+        if ($do == 'read') { //Get the status from the file. Stored in JSON array.
+            $this->localLogHistory = $statusLogArr;
+
+            $this->localLogLastCall = $statusLogArr[0]; //Store only the last results of the log in a var to access in other locations.
             /*
              * Get last block height: $this->statusLogLastResult['blockHeight']
              * Get last reported timestamp(epoch time): $this->statusLogLastResult['reportTime']
              * Get last sync result: $this->statusLogLastResult['synchronized']
              */
         } else { //write to file
-            echo "Entered write log \n";
-            $NewLog [] = [//New data to add to the log
-                          'restartRequested' => $this->restart,
-                          'restartAttempts' => $this->restartAttempts,
-                          'nodeStatus' => $this->nodeStatus,
-                          'synchronized' => $this->synchronized,
-                          'synchronizedBehindCount' => $this->synchronizedBehindCount,
-                          'blockHeight' => $this->nodeBlockHeight,
-                          'serverHWUtilization' => $this->serverHWUtilization,
-                          'reportTime' => time(),
-                          'ExternalAPIStatus' => $this->externalNebState,
-                          'messages' => $this->messages,
-            ];
-            $this->updatedLog = $NewLog;
-            $NewLog = $NewLog + $this->statusLog;
-            if (count($NewLog) >= NSMSettings::eventsToStoreLocally) { //See if the array has more inputs than requested
-                $NewLog = array_pop($NewLog);
+            echo "Writing log\n";
+            $this->localLogLatest[] = [//New data to add to the log
+                                             'restartRequested' => $this->restart,
+                                             'restartAttempts' => $this->restartAttempts,
+                                             'nodeStatus' => $this->nodeStatus,
+                                             'synchronized' => $this->synchronized,
+                                             'synchronizedBehindCount' => $this->synchronizedBehindCount,
+                                             'blockHeight' => $this->nodeBlockHeight,
+                                             'serverHWUtilization' => $this->serverHWUtilization,
+                                             'reportTime' => time(),
+                                             'ExternalAPIStatus' => $this->externalNebState,
+                                             'messages' => $this->messages];
+            if ($this->localLogHistory)
+                $NewLog = $this->localLogLatest + $this->localLogHistory;
+            else
+                $NewLog = $this->localLogLatest;
+            $cnt = count($NewLog);
+            //  echo "\nTEST $cnt\n";
+            if ($cnt >= NSMSettings::eventsToStoreLocally) { //See if the array has more inputs than requested
+                unset($NewLog[$cnt]);
+                //$NewLog = array_pop($NewLog);
                 echo "removing last array\n";
             }
-            file_put_contents(NSMSettings::statusFilename, json_encode($NewLog)); //Store the log
+            /*            if (!file_exists(NSMSettings::localLogFile)) { //Set the initial file if it does not exist
+
+                        }*/
         }
     }
 
@@ -664,7 +702,7 @@ class NebulasServiceMonitor
             $this->
             $to = 'NSMSettings::reportToEmail';
             $subject = 'Nebulas Node monitor notification';
-            $errorMessage = print_r($this->updatedLog, true);
+            $errorMessage = print_r($this->localLogLatest, true);
             $message = 'Hello this is a message about Nebulas node ' . NSMSettings::nodeName . '. It experienced a error and may require your attention. Below is the results from the NebulasServiceMonitor program running on the server.
             
             ' . $errorMessage;

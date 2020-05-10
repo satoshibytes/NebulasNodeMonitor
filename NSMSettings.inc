@@ -92,7 +92,7 @@ class NSMSettings extends NebulasServiceMonitor
     protected const  nebListenPort = '8685';
 
     //We are going to store some log information locally for proper operation
-    protected const  statusFilename = 'NebulasServiceMonitor.log';
+    protected const  localLogFile = 'NebulasServiceMonitor.log';
 
     //How many events to store locally. This includes messages, block height, etc... in a JSON array.
     // Minimum is 1 so to check that block height is increasing.
