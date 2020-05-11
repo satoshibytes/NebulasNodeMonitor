@@ -551,6 +551,7 @@ class NebulasServiceMonitor
 		$findNebProcGrep = '[' . NSMSettings::nebStartServiceCommand[0] . ']' . substr(NSMSettings::nebStartServiceCommand, 1); //Set the search string
 		//$findNebProcCommand = NSMSettings::nebStartServiceCommand;
 		$findNebProc = shell_exec("ps -ux | grep \"$findNebProcGrep\""); //Find the .neb process based on the $settings['restartServiceCommand'] setting
+		echo "ps -ux | grep \"$findNebProcGrep\" \n$findNebProc";
 		if ($findNebProc) { //Process found
 			$findNebProcExp = explode('\n', $findNebProc); //Break down the results by line (ps -ux | grep "[n]eb -c mainnet/conf/config.conf")
 			if (count($findNebProcExp) > 1) { //Multiple processes found - should only be one
@@ -646,12 +647,12 @@ class NebulasServiceMonitor
 
 	private function startNeb() //Start the neb service
 	{
-		echo"Starting Neb\n";
+		echo "Starting Neb\n";
 		$restartServiceDelayCheck = NSMSettings::restartServiceDelayCheck + ($this->restartAttempts * 5);//Just in case it takes longer to start neb.
 		$this->nodeProcId('kill');//Kill any existing processes - Make sure all processes are terminated
 		putenv('export LD_LIBRARY_PATH=$CUR_DIR/native-lib:$LD_LIBRARY_PATH');//Set evn variables for .neb - not needed for all systems but safe than sorry.
 		shell_exec(NSMSettings::nebStartServiceCommand . ' > /dev/null &'); //Execute startup command and direct the output to null
-			echo 'export LD_LIBRARY_PATH=$CUR_DIR/native-lib:$LD_LIBRARY_PATH' . "\n" . NSMSettings::nebStartServiceCommand . ' > /dev/null &';
+		echo 'export LD_LIBRARY_PATH=$CUR_DIR/native-lib:$LD_LIBRARY_PATH' . "\n" . NSMSettings::nebStartServiceCommand . ' > /dev/null &';
 		sleep($restartServiceDelayCheck); //wait for the node to come online before checking the status
 		$this->nodeStatusRPC();
 		if ($this->nodeStatus == 'offline') {
