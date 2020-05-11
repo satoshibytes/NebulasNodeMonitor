@@ -27,6 +27,7 @@ class NSMSettings extends NebulasServiceMonitor
 	 * Default is '2'
 	 */
 	protected const severityLevelMessageSend = '2';
+
 	//What is the name of the node
 	protected const nodeName = 'My_node_1';
 
@@ -34,7 +35,7 @@ class NSMSettings extends NebulasServiceMonitor
 	protected const  restartServiceIfNotFound = true; //true or false
 
 	//Do you want to allow the program to restart the node - if set to false, you will still receive notifications/logs about it being down but it will not be restarted. Good for testing.
-	protected const enableRestartService = false;
+	protected const enableRestartService = true;
 
 	//Server limits before triggering errors
 	//The minimum amount of free ram available before triggering a error. For example if set to 20, the minimum amount of free ram must be 20%.
