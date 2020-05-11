@@ -91,7 +91,10 @@ class NSMSettings extends NebulasServiceMonitor
 	protected const goNebulasDirectory = '/home/neb/go-nebulas/';
 
 	//Select the network to use this service as - it modifies the startup config.
-	protected const selectedNetwork = 'mainnet';
+	protected const selectedNetwork = 'testnet';
+
+	//Get current block height from external source
+	protected const externalApiURL = 'https://testnet.nebulas.io';//'https://mainnet.nebulas.io';
 
 	/*The startup command along with what config to use. Please note - due to how the nebulas service is designed, the full directory of your configuration file must be included. If you clone this file into a sub-directory of go-nebulas such as NebulasNodeMonitor if the repo is cloned, the following config would be used with the user neb executing nebulas.
 	 * Example:  /home/neb/go-nebulas/neb -c /home/neb/go-nebulas/mainnet/conf/config.conf
@@ -109,8 +112,5 @@ class NSMSettings extends NebulasServiceMonitor
 
 	//How many events to store locally. This includes messages, block height, etc... in a JSON array.
 	// Minimum is 1 so to check that block height is increasing.
-	protected const  eventsToStoreLocally = 6;
-
-	//Get current block height from external source
-	protected const externalApiURL = 'https://testnet.nebulas.io';//'https://mainnet.nebulas.io';
+	protected const  eventsToStoreLocally = 20;
 }
