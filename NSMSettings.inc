@@ -81,7 +81,7 @@ class NSMSettings extends NebulasServiceMonitor
 	protected const restartServiceIfMultipleProcFound = true; //true or false
 
 	//How long in seconds to wait to verify the process restarted
-	protected const restartServiceDelayCheck = 10;
+	protected const restartServiceDelayCheck = 20;
 
 	/*
 	 * What command to execute to restart the service? Be sure to use full directory location.
