@@ -646,27 +646,11 @@ class NebulasServiceMonitor
 
 	private function startNeb() //Start the neb service
 	{
-		//Kill any existing processes - Make sure all processes are terminated
-		$this->nodeProcId('kill');
-		/* Testing operation methods
-		   //shell_exec("source ~/.bashrc");
-		   //export LD_LIBRARY_PATH
-		   //  echo 'export LD_LIBRARY_PATH="' . $this->NSMSettings->goNebulasDirectory . '/native-lib"; ' . $this->NSMSettings->goNebulasDirectory;
-		   //$test = shell_exec('export LD_LIBRARY_PATH="' . $this->NSMSettings->goNebulasDirectory . '/native-lib"; ' . $this->NSMSettings->goNebulasDirectory);
-		   //shell_exec('export LD_LIBRARY_PATH="' . $this->NSMSettings->goNebulasDirectory . '/native-lib;"');
-		   //export LD_LIBRARY_PATH=$CUR_DIR/native-lib:$LD_LIBRARY_PATH
-		   //echo "--> export LD_LIBRARY_PATH={$this->NSMSettings->goNebulasDirectory}native-lib:\$LD_LIBRARY_PATH \n";
-		   // exec("export LD_LIBRARY_PATH={$this->NSMSettings->goNebulasDirectory}native-lib:\$LD_LIBRARY_PATH");+
-		   // echo 'export LD_LIBRARY_PATH=$CUR_DIR/native-lib:$LD_LIBRARY_PATH';
-				//  echo "\n-->" . NSMSettings::goNebulasDirectory . NSMSettings::nebStartServiceCommand . ' > /dev/null &' . "\n";
-	//echo "--> ./nebStart.sh " . $this->NSMSettings->nebStartServiceCommand . '&';
-		//shell_exec("./nebStart.sh " . $this->NSMSettings->nebStartServiceCommand . '&');//Execute startup command
-		  */
-		putenv('export LD_LIBRARY_PATH=$CUR_DIR/native-lib:$LD_LIBRARY_PATH');//Set evn variables for .neb
-		exec(NSMSettings::goNebulasDirectory . NSMSettings::nebStartServiceCommand . ' > /dev/null &'); //Execute startup command
+		$this->nodeProcId('kill');//Kill any existing processes - Make sure all processes are terminated
+		putenv('export LD_LIBRARY_PATH=$CUR_DIR/native-lib:$LD_LIBRARY_PATH');//Set evn variables for .neb - not needed for all systems but safe than sorry.
+		shell_exec(NSMSettings::nebStartServiceCommand . ' > /dev/null &'); //Execute startup command and direct the output to null
 
 		sleep(NSMSettings::restartServiceDelayCheck); //wait for the node to come online before checking the status
-		$maxRestartAttempts = NSMSettings::maxRestartAttempts;//Number of attempts to restart the node
 		$this->nodeStatusRPC();
 		if ($this->nodeStatus == 'offline') {
 			do {
@@ -694,14 +678,14 @@ class NebulasServiceMonitor
 		}
 	}
 
-	private function reportData($req)
+	private function reportData($req = null)
 	{
 		/*        if (NSMSettings::reportTo == 'externalWebsite') {
 
 				}*/
 		if ($req == 'testEmail') {
 			//Send a test email
-			$message = 'Hello this is a requested test message from Nebulas node ' . NSMSettings::nodeName.' with the latest log included: 
+			$message = 'Hello this is a requested test message from Nebulas node ' . NSMSettings::nodeName . ' with the latest log included: 
 			';
 		}
 		if (NSMSettings::reportToEmail) {
