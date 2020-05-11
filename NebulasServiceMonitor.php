@@ -683,29 +683,27 @@ class NebulasServiceMonitor
 		/*        if (NSMSettings::reportTo == 'externalWebsite') {
 
 				}*/
-		$message = null;
-		if ($req == 'testEmail') {
-			//Send a test email
-			$message = 'Hello this is a requested test message from Nebulas node ' . NSMSettings::nodeName . ' with the latest log included: 
-			';
-		}
 		if (NSMSettings::reportToEmail) {
 			//Default email service
 			$to = NSMSettings::reportToEmail;
 			$subject = 'Nebulas Node monitor notification for ' . NSMSettings::nodeName;
 			$logMessage = print_r($this->localLogLatest, true);
-			if ($message == null) {
+			if ($req == 'testEmail') {
+				//Send a test email
+				$message = 'Hello this is a requested test message from Nebulas node ' . NSMSettings::nodeName . ' with the latest log included: 
+			
+			';
+			} else {
 				$message = 'Hello this is a message about Nebulas node ' . NSMSettings::nodeName . '. It experienced a error and may require your attention. Below is the results from the NebulasServiceMonitor program running on the server.
             
             ';
 			}
-			$message = $message . $logMessage;
 			$headers = array(
 				'From'     => NSMSettings::reportEmailFrom,
 				'Reply-To' => NSMSettings::reportEmailFrom,
 				'X-Mailer' => 'PHP/' . phpversion()
 			);
-			mail($to, $subject, $message, $headers);
+			mail($to, $subject, $message . $logMessage, $headers);
 		}
 	}
 }
