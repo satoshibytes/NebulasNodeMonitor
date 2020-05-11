@@ -29,7 +29,7 @@ class NSMSettings extends NebulasServiceMonitor
 	protected const severityLevelMessageSend = '2';
 
 	//What is the name of the node
-	protected const nodeName = 'My_node_1';
+	protected const nodeName = 'Node-Name';
 
 	//If the service is not found, should we restart the service?
 	protected const  restartServiceIfNotFound = true; //true or false
@@ -75,7 +75,8 @@ class NSMSettings extends NebulasServiceMonitor
 	protected const nodeSyncMinBlockCountIncreasePercentage = 10;
 
 	//Notify the server every 5 minutes about your nodes status. If using the service provided by @satoshiBytes, keep it set to 600 - future feature and currently not available
-	protected const delayBetweenReports = 600;//Should be set to the cron job time (e.g. 5 minutes = 600 seconds).
+	//Should be set to the cron job time (e.g. 5 minutes = 600 seconds).
+	protected const delayBetweenReports = 600;
 
 	//If there are multiple neb processes found, stop and restart them.
 	protected const restartServiceIfMultipleProcFound = true; //true or false
@@ -104,10 +105,8 @@ class NSMSettings extends NebulasServiceMonitor
 	//    /home/neb/go-nebulas/neb -c /home/neb/go-nebulas/mainnet/conf/config.conf
 	//    /home/neb/go-nebulas/neb -c mainnet/conf/config.conf
 
-	//me@mypc:~$ (cd ~/my/source/code/directory; make)
-
 	//How many times should we try to restart .neb before giving up.
-	protected const maxRestartAttempts = 8;
+	protected const maxRestartAttempts = 5;
 
 	//Set the neb listening port
 	protected const  nebListenPort = '8685';
