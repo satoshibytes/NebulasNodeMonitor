@@ -73,8 +73,8 @@ class NebulasServiceMonitor
 	{//readLog
 		switch ($doThis) {
 			case 'testEmail':
-				$this->reportData('testEmail');
 				$this->readWriteLog('read');
+				$this->reportData('testEmail');
 				break;
 			case 'readLog':
 				$this->readWriteLog('read');
