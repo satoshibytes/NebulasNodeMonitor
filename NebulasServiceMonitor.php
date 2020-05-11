@@ -353,7 +353,7 @@ class NebulasServiceMonitor
 	function maxLogSeverityNotice()
 	{//Keep track of the severity of messages
 		foreach ($this->messages as $key => $val) {
-			$thisVal = array_search($val['result'], $this->severityMessageArray);
+			@$thisVal = array_search($val['result'], $this->severityMessageArray);
 			if ($thisVal > $this->severityMessageMax)
 				$this->severityMessageMax = $thisVal;
 		}
@@ -690,10 +690,10 @@ class NebulasServiceMonitor
 			';
 		}
 		if (NSMSettings::reportToEmail) {
-			//Default emailer
-			$to = 'NSMSettings::reportToEmail';
-			$subject = 'Nebulas Node monitor notification';
-			$logMessage = print_r($this->localLogLatest, true);
+			//Default email service
+			$to = NSMSettings::reportToEmail;
+			$subject = 'Nebulas Node monitor notification for ' . NSMSettings::nodeName;
+			$logMessage = print_r($this->localLogLatest, Ktrue);
 			if ($message == null) {
 				$message = 'Hello this is a message about Nebulas node ' . NSMSettings::nodeName . '. It experienced a error and may require your attention. Below is the results from the NebulasServiceMonitor program running on the server.
             
