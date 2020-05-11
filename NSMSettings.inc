@@ -20,11 +20,21 @@ class NSMSettings extends NebulasServiceMonitor
     //Where should we say the email came from?
     protected const reportEmailFrom = '';
 
+    /*
+     * Message logs can differ with the following levels:
+     * 0 => 'success', 1 => 'info', 2 => 'notify', 3 => 'warn', 4 => 'error'
+     * Set the integer below of when you should receive notification about a problem.
+     * Default is '2'
+     */
+    protected const severityLevelMessageSend='2';
     //What is the name of the node
     protected const nodeName = 'My_node_1';
 
     //If the service is not found, should we restart the service?
-    protected const  restartService = true; //true or false
+    protected const  restartServiceIfNotFound = true; //true or false
+
+	//Do you want to allow the program to restart the node - if set to false, you will still receive notifications/logs about it being down but it will not be restarted. Good for testing.
+	protected const enableRestartService=false;
 
     //Server limits before triggering errors
     //The minimum amount of free ram available before triggering a error. For example if set to 20, the minimum amount of free ram must be 20%.
@@ -38,7 +48,6 @@ class NSMSettings extends NebulasServiceMonitor
 
     //Restart node if max load is reached
     protected const restartIfMaxLoadExceeded = true;
-
 
     //When to restart node
     //Restart node if we run out of minimum ram
@@ -54,7 +63,7 @@ class NSMSettings extends NebulasServiceMonitor
      * If set to 1, it will be restarted every time it's not synced.
      * If set to 0, the node will not be restarted
     */
-    protected const nodeBehindRestartCount = 2;
+    protected const nodeBehindRestartCount = 3;
 
     /*
      * If the node is not synced, how many blocks are acceptable per check to consider the node actively proceeding the sync process.
@@ -64,8 +73,8 @@ class NSMSettings extends NebulasServiceMonitor
      */
     protected const nodeSyncMinBlockCountIncreasePercentage = 10;
 
-    //Notify the server every 5 minutes about your nodes status. If using the service provided by @satoshiBytes, keep it set to 600
-    protected const delayBetweenReports = 600;
+    //Notify the server every 5 minutes about your nodes status. If using the service provided by @satoshiBytes, keep it set to 600 - future feature and currently not available
+    protected const delayBetweenReports = 600;//Should be set to the cron job time (e.g. 5 minutes = 600 seconds).
 
     //If there are multiple neb processes found, stop and restart them.
     protected const restartServiceIfMultipleProcFound = true; //true or false
