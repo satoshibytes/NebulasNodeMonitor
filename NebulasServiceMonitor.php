@@ -683,6 +683,7 @@ class NebulasServiceMonitor
 		/*        if (NSMSettings::reportTo == 'externalWebsite') {
 
 				}*/
+		$message = null;
 		if ($req == 'testEmail') {
 			//Send a test email
 			$message = 'Hello this is a requested test message from Nebulas node ' . NSMSettings::nodeName . ' with the latest log included: 
@@ -693,10 +694,11 @@ class NebulasServiceMonitor
 			$to = 'NSMSettings::reportToEmail';
 			$subject = 'Nebulas Node monitor notification';
 			$logMessage = print_r($this->localLogLatest, true);
-			if (!$message)
+			if ($message == null) {
 				$message = 'Hello this is a message about Nebulas node ' . NSMSettings::nodeName . '. It experienced a error and may require your attention. Below is the results from the NebulasServiceMonitor program running on the server.
             
-            ' . $logMessage;
+            ';
+			}
 			$message = $message . $logMessage;
 			$headers = array(
 				'From'     => NSMSettings::reportEmailFrom,
