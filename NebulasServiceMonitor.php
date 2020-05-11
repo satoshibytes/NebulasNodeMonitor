@@ -693,7 +693,7 @@ class NebulasServiceMonitor
 			//Default email service
 			$to = NSMSettings::reportToEmail;
 			$subject = 'Nebulas Node monitor notification for ' . NSMSettings::nodeName;
-			$logMessage = print_r($this->localLogLatest, Ktrue);
+			$logMessage = print_r($this->localLogLatest, true);
 			if ($message == null) {
 				$message = 'Hello this is a message about Nebulas node ' . NSMSettings::nodeName . '. It experienced a error and may require your attention. Below is the results from the NebulasServiceMonitor program running on the server.
             
