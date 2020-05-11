@@ -286,12 +286,12 @@ class NebulasServiceMonitor
 		$this->nodeStatusRPC();//Get the node status via RPC req
 	}
 
-	private function readWriteLog($do = 'read')
+	private function readWriteLog($req = 'read')
 	{   //Store the current settings in a local file to verify the node status/
 		//Default is to read but can specify write and erase.
-		if ($do == 'erase') {
+		if ($req == 'erase') {
 			unlink(NSMSettings::localLogFile);
-		} else if ($do == 'writeInitial') {
+		} else if ($req == 'writeInitial') {
 			$this->showStatus();
 			$this->localLogLatest[time()] = [//New data to add to the log
 			                                 'restartRequested'        => $this->restart,
@@ -307,7 +307,7 @@ class NebulasServiceMonitor
 			                                 'messages'                => $this->messages];
 			file_put_contents(NSMSettings::localLogFile, json_encode($this->localLogLatest)); //Store the log
 			chmod(NSMSettings::localLogFile, 0755);
-			$do = 'write';
+			$req = 'write';
 		}
 
 		if (!file_exists(NSMSettings::localLogFile)) { //Set the initial file if it does not exist
@@ -315,11 +315,11 @@ class NebulasServiceMonitor
 		}
 		//Get the log file
 		$statusLogArr = json_decode(file_get_contents(NSMSettings::localLogFile), true); //Need to get data regardless
-		if ($do == 'read') { //Get the status from the file. Stored in JSON array.
+		if ($req == 'read') { //Get the status from the file. Stored in JSON array.
 			$this->localLogHistory = $statusLogArr;
 			$key = array_key_first($statusLogArr);
 			$this->localLogLastCall = $statusLogArr[$key]; //Store only the last results of the log in a var to access in other locations.
-		} else if ($do == 'readLastLog') {
+		} else if ($req == 'readLastLog') {
 			$this->localLogHistory = $statusLogArr;
 			$key = array_key_first($statusLogArr);
 			$this->localLogLastCall = $statusLogArr[$key];
