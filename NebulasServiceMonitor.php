@@ -652,7 +652,7 @@ class NebulasServiceMonitor
 		$this->nodeProcId('kill');//Kill any existing processes - Make sure all processes are terminated
 		putenv('export LD_LIBRARY_PATH=$CUR_DIR/native-lib:$LD_LIBRARY_PATH');//Set evn variables for .neb - not needed for all systems but safe than sorry.
 		shell_exec(NSMSettings::nebStartServiceCommand . ' > /dev/null &'); //Execute startup command and direct the output to null
-		echo "\n\n". NSMSettings::nebStartServiceCommand . " > /dev/null &'\n\n";
+		echo "\n\n". NSMSettings::nebStartServiceCommand . " > /dev/null &\n\n";
 		//echo 'export LD_LIBRARY_PATH=$CUR_DIR/native-lib:$LD_LIBRARY_PATH' . "\n" . NSMSettings::nebStartServiceCommand . ' > /dev/null &';
 		sleep($restartServiceDelayCheck); //wait for the node to come online before checking the status
 		$this->nodeStatusRPC();
