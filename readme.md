@@ -26,8 +26,9 @@ Thus far, testing has been via a Debian based server running PHP 7.2. It should 
     * For example, Debian based systems can istall PHP via sudo user with the command sudo __apt install php7.2-cli php7.2-curl__
 * Clone or copy this repo into your go-nebulas directory: From your go-nebulas directory: git clone https://github.com/satoshibytes/NebulasNodeMonitor.git
 * Review the settings stored in the file __NSMSettings.inc__ and adjust accordingly to your requirements. The document is comment and should be easy to edit.
-* Setup a cron job for 5 minutes (can be set higher or lower for more or less frequent checks): 
-    * Type crontab -e (_if prompted for which editor, select nano_) and at the bottom of your cron file, enter __*/5 * * * * /path/to/go-nebulas/NebulasServiceMonitor.php__
+* From the newly created __NebulasNodeMonitor__ directory, modify the directory setting within the file NebSvcMonitor.sh then setup the required symbolic links by entering __./NebSvcMonitor.sh install__
+    * Check and fix any errors then return to the go-nebulas directory. From there, enter __./NebSvcMonitor.sh__ and it will remain active checking your node.
+    * If you would like to have this service start at boot, you can set a cron job by entering __crontab -e__ and add __@reboot /path/to/go-nebulas/NebSvcMonitor.sh__ at the bottom of the file.
     
 
 _Note: /path/to/go-nebulas/ must be the actual path to your go-nebulas install. It probably looks something like /home/neb/go-nebulas/NebulasServiceMonitor.php_

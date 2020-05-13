@@ -88,7 +88,7 @@ $NSMSettings['delayBetweenReports'] = 60;// 300;
 $NSMSettings['restartServiceIfMultipleProcFound'] = true; //true or false
 
 //How long in seconds to wait to verify the process restarted
-$NSMSettings['restartServiceDelayCheck'] = 20;
+$NSMSettings['restartServiceDelayCheck'] = 30;
 
 /*
  * What command to execute to restart the service? Be sure to use full directory location.
