@@ -6,13 +6,13 @@
  * Be sure to set your configuration in the NebulasServiceMonitorSettings.inc file.
  * Script requirements
  * ->Server must have PHP 7 (possibly 5.6) or later installed (apt install php-cli php-curl)
- * ->the file NebulasServiceMonitor.php and neb need to be owned by the same users (for some systems, it may be required to change who php runs as or give sudo access)//TODO check permission services
+ * ->the file NebSvcMonitor.php and neb need to be owned by the same users (for some systems, it may be required to change who php runs as or give sudo access)//TODO check permission services
  * ->Server must have curl installed
- * ->chmod +x NebulasServiceMonitor.php
- * execution: php NebulasServiceMonitor.php REQ
- * ->php NebulasServiceMonitor.php stopNeb
- * ->php NebulasServiceMonitor.php startNeb
- * ->php NebulasServiceMonitor.php status
+ * ->chmod +x NebSvcMonitor.php
+ * execution: php NebSvcMonitor.php REQ
+ * ->php NebSvcMonitor.php stopNeb
+ * ->php NebSvcMonitor.php startNeb
+ * ->php NebSvcMonitor.php status
  *
  *
  *
@@ -27,15 +27,14 @@ if (isset($argv[1])) { //&& $argv[2] == 'fromBash'
 
 //Include the settings
 $NSMSettings = [];
-require_once getcwd() . "/NSMSettings.inc";
+require_once getcwd() . "/NebSvcMonitorSettings.inc";
 //Call the class
-$NebulasServiceMonitor = new NebulasServiceMonitor($NSMSettings);
+$NebulasServiceMonitor = new NebSvcMonitor($NSMSettings);
 //Do a process as defined via command line4
 $NebulasServiceMonitor->doProcess($doProcess);
 
-class NebulasServiceMonitor
+class NebSvcMonitor
 {// extends NSMSettings
-
 	//Define initial variables
 	private $nodeRestart = false; //does the node need to be restarted - set initial to false
 	private $restartAttempts = 0; //count how many restart attempts have been made
@@ -53,6 +52,8 @@ class NebulasServiceMonitor
 	private $localLogLatest;//
 	private $severityMessageArray = [0 => 'success', 1 => 'info', 2 => 'notify', 3 => 'warn', 4 => 'error'];
 	private $severityMessageMax = 0;
+	private $NSMSettings;//Settings storage
+	private $logEchoNumber = 1;
 	public $about = [//About
 	                 'version'            => '0.1',
 	                 'name'               => 'Nebulas Service Monitor',
@@ -60,7 +61,7 @@ class NebulasServiceMonitor
 	                 'warning'            => 'Work in progress and experimental - do not use on a live node server',
 	                 'github'             => 'https://github.com/satoshibytes/NebulasNodeMonitor/',
 	                 'available commands' => ['serverStatus' => 'Displays the information about the node and resource usage',
-	                                          'showSettings' => 'Shows all the settings as set in the NSMSettings.inc file',
+	                                          'showSettings' => 'Shows all the settings as set in the NebSvcMonitorSettings.inc file',
 	                                          'statusCheck'  => 'Check the status of the node and intervene if necessary - This is the default action',
 	                                          'showStatus'   => 'Check the status of the node but do not intervene',
 	                                          'killNeb'      => 'Kills the process - cal alternatively use stopNeb',
@@ -72,7 +73,12 @@ class NebulasServiceMonitor
 	                                          'testEmail'    => 'Send a test email to the address listed in the config.']
 	];
 
-	//Import the settings
+	/*
+		function writeToTestLog()
+		{
+
+		}*/
+
 	function __construct($NSMSettings)
 	{
 		$this->NSMSettings = $NSMSettings;
@@ -126,6 +132,15 @@ class NebulasServiceMonitor
 		}
 	}
 
+	private function verboseLog($val)
+	{
+		if ($this->NSMSettings['verbose'] == 'echo') {
+			echo $this->logEchoNumber . ' ' . $val . "\n";
+			$this->logEchoNumber++;
+		}
+
+	}
+
 	private function statusCheck()
 	{//This is the primary status checker and restart function
 		/*
@@ -154,13 +169,18 @@ class NebulasServiceMonitor
 		 * Additional feature: check block height vs other nodes.
 		 *  Check hdd space on partition where blocks are located.
 		 */
+		$this->verboseLog("statusCheck");
 		//Get the server hardware status
 		$this->serverStatus();
+		$this->verboseLog("serverStatus");
 		//First check if node is synced.
 		$this->nodeStatusRPC();
+		$this->verboseLog("nodeStatusRPC");
 		$this->getExternalAPIData();
+		$this->verboseLog("getExternalAPIData");
 		//Get the historical log status.
 		$this->readWriteLog('read');
+		$this->verboseLog("Node Status: {$this->nodeStatus}");
 
 		if ($this->nodeStatus == 'online') { //Node is running //TODO verify this entire section
 			$externalNebStateBlockHeight = $this->externalNebState['result']['height'];
@@ -174,35 +194,36 @@ class NebulasServiceMonitor
 					                     $this->externalNebState['result']['height'] + 1];
 					if (in_array($this->nodeBlockHeight, $acceptableHeight)) { //Block heights do not match local vs external - we will not restart on this error
 						//TODO make it a option)
+						$msg = "The node is reporting to be synced.";
 						$this->messages[] = [
 							'function'    => 'statusCheck',
-							'messageRead' => "The node is reporting to be synced.",
+							'messageRead' => $msg,
 							'result'      => 'success',
 							'time'        => time()
 						];
 						$this->synchronizedBehindCount = 0; //Set the count to 0 for the current log status
-						$this->messages[] = [
-							'function'    => 'statusCheck',
-							'messageRead' => "The node is reporting to be synced.",
-							'result'      => 'success',
-							'time'        => time()
-						];
+						$this->verboseLog($msg);
 					} else {//Node is behind
 						$diff = $this->externalNebState['result']['height'] - $this->nodeBlockHeight;
+						$msg = "The local node states that it is in sync but is behind when compared to external API results.\n 
+                            Local Height: $this->nodeBlockHeight,| External Height: {$this->externalNebState['result']['height']} | Diff: {$diff}";
 						$this->messages[] = [
 							'function'    => 'statusCheck',
-							'messageRead' => "The local node states that it is in sync but is behind when compared to external API results.\n 
-                            Local Height: $this->nodeBlockHeight,| External Height: {$this->externalNebState['result']['height']} | Diff: {$diff}",
+							'messageRead' => $msg,
 							'result'      => 'success',
 							'time'        => time()];
+						$this->verboseLog($msg);
+
 					}
 				} else {
+					$msg = "The node is reporting to be synced but the external api node was not available for verification.";
 					$this->messages[] = [
 						'function'    => 'statusCheck',
-						'messageRead' => "The node is reporting to be synced but the external api node was not available for verification.",
+						'messageRead' => $msg,
 						'result'      => 'notify',
 						'time'        => time()
 					];
+					$this->verboseLog($msg);
 				}
 			} else {
 				//The node is reporting not being synced.
@@ -211,11 +232,13 @@ class NebulasServiceMonitor
 				if ($this->localLogLastCall['synchronized'] == false) {//The last check resulted in a failed synchronized result. Let's see if the block height is increasing at a proper rate.
 					//First see if the height increased at all
 					if ($this->localLogLastCall['blockHeight'] == $this->nodeBlockHeight) {//The block height did not increase.
+						$msg = "The block height did not increase from the last check. Setting restart required to true. Log Last Height: {$this->localLogLastCall['blockHeight']} | Current Height: {$this->nodeBlockHeight}.";
 						$this->messages[] = [
 							'function'    => 'statusCheck',
-							'messageRead' => "The block height did not increase from the last check. Setting restart required to true. Log Last Height: {$this->localLogLastCall['blockHeight']} | Current Height: {$this->nodeBlockHeight}.",
+							'messageRead' => $msg,
 							'result'      => 'error',
 							'time'        => time()];
+						$this->verboseLog($msg);
 						$this->nodeRestart = true;
 					} else { //The block height did increase - let's see if its within acceptable rate
 						//What is the minimum amount of blocks generated we should accept.
@@ -223,63 +246,77 @@ class NebulasServiceMonitor
 						$blockHeightIncreaseCount = $this->localLogLastCall['blockHeight'] + $minBlocksGen;
 						if ($this->nodeBlockHeight < $blockHeightIncreaseCount) {
 							//Block height increasing too slowly
+							$msg = "Block height increasing too slowly.";
+							$syncAtProperRate = false;
 							$this->messages[] = [
 								'function'    => 'statusCheck',
-								'messageRead' => "Block height increasing too slowly.",
+								'messageRead' => $msg,
 								'result'      => 'warn',
-								'time'        => time()
-							];
+								'time'        => time()];
+							$this->verboseLog($msg);
 						} else {
 							//Block height is increasing fast enough
+							$msg = "Block height increasing at proper rate.";
+							$syncAtProperRate = true;
 							$this->messages[] = [
 								'function'    => 'statusCheck',
-								'messageRead' => "Block height increasing at proper rate.",
+								'messageRead' => $msg,
 								'result'      => 'info',
 								'time'        => time()
 							];
+							$this->verboseLog($msg);
 						}
-						if ($this->synchronizedBehindCount > $this->NSMSettings['nodeBehindRestartCount']) { //The node is behind for the max amount of checks
+						if ($this->synchronizedBehindCount > $this->NSMSettings['nodeBehindRestartCount'] && $this->NSMSettings['nodeRestartIfSyncSpeedFast'] == true) { //The node is behind for the max amount of checks
+							$msg = "The node is behind for the max amount of checks. Setting restart required to true. Local Height: $this->nodeBlockHeight,| External Height: {$this->externalNebState['result']['height']}";
 							$this->messages[] = [
 								'function'    => 'statusCheck',
-								'messageRead' => "The node is behind for the max amount of checks. Setting restart required to true. Local Height: $this->nodeBlockHeight,| External Height: {$this->externalNebState['result']['height']}",
+								'messageRead' => $msg,
 								'result'      => 'error',
 								'time'        => time()
 							];
-							$this->synchronizedBehindCount = 0;
-							$this->nodeRestart = true;
+							$this->verboseLog($msg);
+							$this->synchronizedBehindCount = 0;//Set to 0 to stop continuous restart
+							$this->nodeRestart = true;//Set the node to restart
 						}
 					}
 				}
 			}
 		} else { //Node is offline - find a procId, kill it and mark as restart required.
+			$msg = "The node was found to be offline. Restarting node.";
 			$this->messages[] = [
 				'function'    => 'statusCheck',
 				'messageRead' => "The node was found to be offline. Restarting node.",
 				'result'      => 'error',
 				'time'        => time()
 			];
+			$this->verboseLog($msg);
+
 			if ($this->NSMSettings['restartServiceIfNotFound'] == true) {//Should we restart the node?
 				$this->nodeRestart = true;//Set the node to restart
 				$this->nodeProcId('kill');//See if the node is online and if so, terminate it.
 			} else {
+				$msg = "The NebSvcMonitor found the node to be offline however, it is set to not start in the config (restartServiceIfNotFound).";
 				$this->messages[] = [
 					'function'    => 'statusCheck',
-					'messageRead' => "The NebulasServiceMonitor found the node to be offline however, it is set to not start in the config (restartServiceIfNotFound).",
+					'messageRead' => $msg,
 					'result'      => 'notify',
 					'time'        => time()
 				];
+				$this->verboseLog($msg);
 			}
 		}
 		if ($this->nodeRestart == true) { //nodeProcId found no running neb functions - restart the service
 			if ($this->NSMSettings['enableRestartService'] == true)
 				$this->startNeb();//Start neb
 			else {
+				$msg = "The NebSvcMonitor found the node to require restarting however, it is set to not restart in the config (enableRestartService).";
 				$this->messages[] = [
 					'function'    => 'statusCheck',
-					'messageRead' => "The NebulasServiceMonitor found the node to require restarting however, it is set to not restart in the config (enableRestartService).",
+					'messageRead' => $msg,
 					'result'      => 'notify',
 					'time'        => time()
 				];
+				$this->verboseLog($msg);
 			}
 		}
 		$this->readWriteLog('write'); //Write the data to the local log
@@ -380,12 +417,14 @@ class NebulasServiceMonitor
 				$this->nodeRestart = true;
 				$messageExtended = " Node will reboot based on config settings";
 			}
+			$msg = "Average 5 minute server load average exceeded the specified max load. Current load: {$loadRaw[1]}." . $messageExtended;
 			$this->messages[] = [
 				'function'    => 'serverStatus',
-				'messageRead' => "Average 5 minute server load average exceeded the specified max load. Current load: {$loadRaw[1]}." . $messageExtended,
+				'messageRead' => $msg,
 				'result'      => 'error',
 				'time'        => time()
 			];
+			$this->verboseLog($msg);
 			unset($messageExtended);
 		}
 		//End check the server load
@@ -428,34 +467,40 @@ class NebulasServiceMonitor
 				$messageExtended = " Node will reboot based on config settings";
 
 			}
+			$msg = "Memory utilization exceeded specified minimum free memory amount percent. Free memory: $freeMemoryPercent." . $messageExtended;
 			$this->messages[] = [
 				'function'    => 'serverStatus',
-				'messageRead' => "Memory utilization exceeded specified minimum free memory amount percent. Free memory: $freeMemoryPercent." . $messageExtended,
+				'messageRead' => $msg,
 				'result'      => 'error',
 				'time'        => time()
 			];
+			$this->verboseLog($msg);
 		}
 		if ($freeSwapPercent < $this->NSMSettings['minFreeSwapPercent']) {//Exceeded free ram
 			if ($this->NSMSettings['restartMinFreeSwapPercent'] == true) {
 				$this->nodeRestart = true;
 				$messageExtended = " Node will reboot based on config settings";
 			}
+			$msg = "SWAP space utilization exceeded specified minimum free memory amount percent. Free swap amount: $freeSwapPercent." . $messageExtended;
 			$this->messages[] = [
 				'function'    => 'serverStatus',
-				'messageRead' => "SWAP space utilization exceeded specified minimum free memory amount percent. Free swap amount: $freeSwapPercent." . $messageExtended,
+				'messageRead' => $msg,
 				'result'      => 'error',
 				'time'        => time()
 			];
+			$this->verboseLog($msg);
 		}
 		//End server memory utilization
 
 		//Result message
+		$msg = "Server Load: {$loadMessage}\nFree Memory Percentage: {$freeMemoryPercent}\nFree Swap Space Percent: $freeSwapPercent";
 		$this->messages[] = [
 			'function'    => 'serverStatus',
-			'messageRead' => "Server Load: {$loadMessage}\nFree Memory Percentage: {$freeMemoryPercent}\nFree Swap Space Percent: $freeSwapPercent",
+			'messageRead' => $msg,
 			'result'      => 'info',
 			'time'        => time()
 		];
+		$this->verboseLog($msg);
 		return null;//Results stored in pre-defined variables
 	}
 
@@ -469,13 +514,16 @@ class NebulasServiceMonitor
 		}
 		if (json_last_error() == JSON_ERROR_NONE) { //API data successfully retrieved.
 			$this->externalNebState = $externalNebStateArray;
+			$msg = "External API block height: {$externalNebStateArray['result']['height']}";
 			$this->messages[] = [
 				'function'    => 'getExternalAPIData',
-				'messageRead' => "External API block height: {$externalNebStateArray['result']['height']}",
+				'messageRead' => $msg,
 				'result'      => 'info',
 				'time'        => time()
 			];
+			$this->verboseLog($msg);
 		} else {
+			$msg = "Error obtaining API data from $externalURL";
 			$this->messages[] = [
 				'function'    => 'getExternalAPIData',
 				'messageRead' => "Error obtaining API data from $externalURL",
@@ -483,6 +531,7 @@ class NebulasServiceMonitor
 				'time'        => time()
 			];
 			$this->externalNebState = null;
+			$this->verboseLog($msg);
 		}
 	}
 
@@ -495,16 +544,17 @@ class NebulasServiceMonitor
 		                CURLOPT_CONNECTTIMEOUT => $timeout,
 		                CURLOPT_RETURNTRANSFER => true];
 		curl_setopt_array($ch, $curlOptions);
-
 		$data = curl_exec($ch);
-
 		if (curl_errno($ch)) {
+			$msg = 'Curl request failed. URL: ' . $url;
 			$this->messages[] = [
 				'function'    => 'curlRequest',
-				'messageRead' => 'Curl request failed. URL: ' . $url,
+				'messageRead' => $msg,
 				'result'      => 'error',
 				'time'        => time()
 			];
+			$this->verboseLog($msg);
+
 			$status = 'error';
 			$this->nodeStatus = 'offline';
 		} else {//Successful response
@@ -529,27 +579,34 @@ class NebulasServiceMonitor
 			$this->nodeBlockHeight = $nodeStatusArray['result']['height'];
 			$this->nodeRestart = false;
 			$this->nodeStatus = 'online';
+			$msg = "Node Online. Block height: {$nodeStatusArray['result']['height']}";
 			$this->messages[] = [
 				'function'    => 'nodeStatusRPC',
-				'messageRead' => "Node Online. Block height: {$nodeStatusArray['result']['height']}",
+				'messageRead' => $msg,
 				'result'      => 'success',
 				'time'        => time()
 			];
+			$this->verboseLog($msg);
+
 			if ($this->synchronized != true) { //Check the status file for the last recorded status
+				$msg = 'Node not synchronized';
 				$this->messages[] = [
 					'function'    => 'nodeStatusRPC',
-					'messageRead' => 'Node not synchronized',
+					'messageRead' => $msg,
 					'result'      => 'warn',
 					'time'        => time()
 				];
+				$this->verboseLog($msg);
 			}
 		} else { //No response from node - node is considered offline
 			//$this->restart = true;
 			$this->nodeStatus = 'offline';
+			$msg = 'Node offline';
 			$this->messages[] = ['function'    => 'nodeStatusRPC',
-			                     'messageRead' => 'Node offline',
+			                     'messageRead' => $msg,
 			                     'result'      => 'error',
 			                     'time'        => time()];
+			$this->verboseLog($msg);
 			$this->nodeRestart = true;
 		}
 		return null;//Results stored in pre-defined variables
@@ -559,26 +616,33 @@ class NebulasServiceMonitor
 	{ //Find the process id on the server and verify that there is only one process running (not counting children).
 		$findNebProcGrep = '[' . $this->NSMSettings['nebStartServiceCommand'][0] . ']' . substr($this->NSMSettings['nebStartServiceCommand'], 1); //Set the search string
 		$findNebProc = shell_exec("ps -ux | grep \"$findNebProcGrep\""); //Find the .neb process based on the $settings['restartServiceCommand'] setting
-		echo "ps -ux | grep \"$findNebProcGrep\" \n$findNebProc";
+		$msg = "ps -ux | grep \"$findNebProcGrep\" \n$findNebProc";
+		$this->verboseLog($msg);
+
 		if ($findNebProc) { //Process found
 			$findNebProcExp = explode('\n', $findNebProc); //Break down the results by line (ps -ux | grep "[n]eb -c mainnet/conf/config.conf")
 			if (count($findNebProcExp) > 1) { //Multiple processes found - should only be one
+				$msg = 'Multiple Neb processes found';
 				$this->messages[] = [
 					'function'    => 'nodeProcId',
-					'messageRead' => 'Multiple Neb processes found',
+					'messageRead' => $msg,
 					'result'      => 'warn',
 					'time'        => time()
 				];
+				$this->verboseLog($msg);
+
 				if ($this->NSMSettings['restartServiceIfMultipleProcFound'] == true) {
 					$this->nodeRestart = true;
 					$this->killAllNeb($findNebProcExp);
 				}
 			} else {
 				if ($req == 'kill') {
+					$msg = 'Manual kill requested';
 					$this->messages[] = ['function'    => 'nodeProcId',
-					                     'messageRead' => 'manual kill requested',
+					                     'messageRead' => $msg,
 					                     'result'      => 'notify',
 					                     'time'        => time()];
+					$this->verboseLog($msg);
 					$this->killAllNeb($findNebProcExp);
 				} else {
 					if (count($findNebProcExp) == 0) {
@@ -586,12 +650,13 @@ class NebulasServiceMonitor
 					} else {
 						if ($req == 'procId') {
 							//return $findNebProcExp;
+							$msg = "One Neb Process ID: {$findNebProcExp}";
 							$this->messages[] = [
 								'function'    => 'nodeProcId',
-								'messageRead' => "One Neb Process ID: {$findNebProcExp}",
-								//'result'      => 'oneProcessFound',
+								'messageRead' => $msg,
 								'result'      => 'null',
 								'time'        => time()];
+							$this->verboseLog($msg);
 						} else {
 							$this->nodeStatus = 'online';
 						}
@@ -599,24 +664,27 @@ class NebulasServiceMonitor
 				}
 			}
 		} else { //No process found
-			if ($req === 'kill') {
+			if ($req == 'kill') {
+				$msg = 'Kill requested but node not running';
 				$this->messages[] = [
 					'function'    => 'nodeProcId',
-					'messageRead' => 'Manual kill requested but node not running',
+					'messageRead' => $msg,
 					'message'     => 'killReqButNodeOffline',
-					//'result'      => 'error',
+					'result'      => 'error',
 					'time'        => time(),
 					'custom'      => "REQ: $req"
 				];
+				$this->verboseLog($msg);
 			} else {
 				$this->nodeStatus = 'offline';
+				$msg = 'No neb process found';
 				$this->messages[] = [
 					'function'    => 'nodeProcId',
-					'messageRead' => 'No neb process found',
-					//'message'      => 'markNodeAsOffline',
+					'messageRead' => $msg,
 					'result'      => 'success',
 					'time'        => time()
 				];
+				$this->verboseLog($msg);
 			}
 		}
 		return null;//Results stored in pre-defined variables
@@ -635,32 +703,36 @@ class NebulasServiceMonitor
 			}
 			//$this->restart = true;
 			$this->nodeStatus = 'offline';
+			$msg = 'neb killed - number of processes: ' . count($procList);
 			$this->messages[] = [
 				'function'    => 'killAllNeb',
-				'messageRead' => 'neb killed - number of processes: ' . count($procList),
+				'messageRead' => $msg,
 				'result'      => 'success',
 				'time'        => time()
 			];
+			$this->verboseLog($msg);
 			$this->nodeProcStatus = 'killed';
 		} else {
+			$msg = 'Unknown data passed';
 			$this->messages[] = [
 				'function'    => 'killAllNeb',
-				'messageRead' => 'Unknown data passed',
-				//'result'      => 'unknownData',
+				'messageRead' => $msg,
 				'result'      => 'error',
 				'time'        => time()
 			];
+			$this->verboseLog($msg);
+
 		}
 	}
 
 	private function startNeb() //Start the neb service
 	{
-		echo "Starting Neb\n";
+		$this->verboseLog('Starting Neb');
 		$restartServiceDelayCheck = $this->NSMSettings['restartServiceDelayCheck'] + ($this->restartAttempts * 5);//Just in case it takes longer to start neb.
 		$this->nodeProcId('kill');//Kill any existing processes - Make sure all processes are terminated
 		putenv('export LD_LIBRARY_PATH=$CUR_DIR/native-lib:$LD_LIBRARY_PATH');//Set evn variables for .neb - not needed for all systems but safe than sorry.
 		shell_exec($this->NSMSettings['nebStartServiceCommand'] . ' > /dev/null &'); //Execute startup command and direct the output to null
-		echo "\n\n" . $this->NSMSettings['nebStartServiceCommand'] . " > /dev/null &\n\n";
+		$this->verboseLog($this->NSMSettings['nebStartServiceCommand'] . " > /dev/null &");
 		//echo 'export LD_LIBRARY_PATH=$CUR_DIR/native-lib:$LD_LIBRARY_PATH' . "\n" . $this->NSMSettings['nebStartServiceCommand . ' > /dev/null &';
 		sleep($restartServiceDelayCheck); //wait for the node to come online before checking the status
 		$this->nodeStatusRPC();
@@ -673,29 +745,34 @@ class NebulasServiceMonitor
 				if ($this->restartAttempts >= $this->NSMSettings['maxRestartAttempts']) {
 					$giveup = true;
 					$this->nodeRestart = false;
+					$msg = 'Restart failed - too many attempts: ' . $this->restartAttempts;
 					$this->messages[] = [
 						'function'    => 'startNeb',
-						'messageRead' => 'Restart failed - too many attempts: ' . $this->restartAttempts,
+						'messageRead' => $msg,
 						'result'      => 'error',
 						'time'        => time()
 					];
+					$this->verboseLog($msg);
 				}
 			} while ($this->nodeRestart == true || $giveup == true);
 		} else {
 			$this->nodeRestart = false;
 			$this->nodeStatus = 'online';
+			$msg = 'Neb is online. Restart attempts: ' . $this->restartAttempts;
 			$this->messages[] = [
 				'function'    => 'startNeb',
-				'messageRead' => 'Neb is online. Restart attempts: ' . $this->restartAttempts,
+				'messageRead' => $msg,
 				'result'      => 'startNebSuccess',
 				'time'        => time()
 			];
+			$this->verboseLog($msg);
 		}
 	}
 
 	private function reportData($req = null)
 	{
-		/*        if ($this->NSMSettings['reportTo == 'externalWebsite') {
+		/*    //Future feature
+		  if ($this->NSMSettings['reportTo == 'externalWebsite') {
 
 				}*/
 		if ($this->NSMSettings['reportToEmail']) {
@@ -709,7 +786,7 @@ class NebulasServiceMonitor
 			
 			';
 			} else {
-				$message = 'Hello this is a message about Nebulas node ' . $this->NSMSettings['nodeName'] . '. It experienced a error and may require your attention. Below is the results from the NebulasServiceMonitor program running on the server.
+				$message = 'Hello this is a message about Nebulas node ' . $this->NSMSettings['nodeName'] . '. It experienced a error and may require your attention. Below is the results from the NebSvcMonitor program running on the server.
             
             ';
 			}
