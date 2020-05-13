@@ -28,12 +28,11 @@ Thus far, testing has been via a Debian based server running PHP 7.2. It should 
 * Review the settings stored in the file __NSMSettings.inc__ and adjust accordingly to your requirements. The document is comment and should be easy to edit.
 * From the newly created __NebulasNodeMonitor__ directory, modify the directory setting within the file NebSvcMonitor.sh then setup the required symbolic links by entering __./NebSvcMonitor.sh install__
     * Check and fix any errors then return to the go-nebulas directory. From there, enter __./NebSvcMonitor.sh__ and it will remain active checking your node.
+    * The timing of node verification can also be set within this file and must match the setting (in seconds) within the __NebSvcMonitorSettings.inc__ file for proper operation.
     * If you would like to have this service start at boot, you can set a cron job by entering __crontab -e__ and add __@reboot /path/to/go-nebulas/NebSvcMonitor.sh__ at the bottom of the file.
-    
 
 _Note: /path/to/go-nebulas/ must be the actual path to your go-nebulas install. It probably looks something like /home/neb/go-nebulas/NebulasServiceMonitor.php_
     
-
 ## Future Features ##
 * I plan to have the program call a 3rd party server to verify the server is still live and if not, send a message to the operator.
 * The 3rd party site can record information such as sync status, server load, interventions, etc...
@@ -41,9 +40,9 @@ _Note: /path/to/go-nebulas/ must be the actual path to your go-nebulas install. 
 * Simpler installer.
 
 ### This is still a work in progress ###
-This repo is a work in progress and I am still working on the code and testing. It's not ready for real world usage at the moment. In the future, I would like to support notifications via Telegram & email as well as a web-based GUI with stored node stats. 
+This repo is a work in progress and is in testing on a live node. It's however not recommended for use on a live node.
 
-If used in a live environment, you can set the option to disable server restarts so it will only observe the system.
+If used in a live environment, you can set the option to disable server restarts so it will only observe the system and send notification -  it will not intervene with operation.
 
 ### License ###
 Copyright 2020 @SatoshiBytes

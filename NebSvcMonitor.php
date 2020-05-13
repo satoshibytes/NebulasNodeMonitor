@@ -73,12 +73,6 @@ class NebSvcMonitor
 	                                          'testEmail'    => 'Send a test email to the address listed in the config.']
 	];
 
-	/*
-		function writeToTestLog()
-		{
-
-		}*/
-
 	function __construct($NSMSettings)
 	{
 		$this->NSMSettings = $NSMSettings;
@@ -133,7 +127,7 @@ class NebSvcMonitor
 	}
 
 	private function verboseLog($val)
-	{
+	{//Primarily used for debugging - can be disabled in the config
 		if ($this->NSMSettings['verbose'] == 'echo') {
 			echo $this->logEchoNumber . ' ' . $val . "\n";
 			$this->logEchoNumber++;

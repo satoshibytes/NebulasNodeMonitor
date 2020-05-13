@@ -1,12 +1,19 @@
 #!/bin/sh
-#Running options:
+#Execution options:
 # NebSvcMonitor.sh > /dev/null &
-# NebSvcMonitor.sh > NebSvcMonLog.txt &
+#   No logs stored
+# NebSvcMonitor.sh > NebSvcMonLog_sh.txt &
+#   Logs stored on server within the go-nebulas directory with the name NebSvcMonLog_sh.txt
+
+##Config section
 #Set the go-nebulas directory with a trailing slash
 goNebulasDir=/home/neb/go-nebulas/
+
 #Set how often the status of .neb should be checked in seconds (default is 300, every 5 minutes).
 #This must also match the setting in the NebSvcMonitorSettings.inc config file for the variable $NSMSettings['delayBetweenReports']
-checkIntervals=60
+checkIntervals=300
+##End of config
+
 PHP=$(which php)
 
 createSymbolicLinks() {
@@ -15,7 +22,7 @@ createSymbolicLinks() {
   ln -s "$goNebulasDir"NebulasNodeMonitor/NebSvcMonitor.php "$goNebulasDir"NebSvcMonitor.php
   ln -s "$goNebulasDir"NebulasNodeMonitor/NebSvcMonitorSettings.inc "$goNebulasDir"NebSvcMonitorSettings.inc
 }
-file="$goNebulasDir"NebulasNodeMonitor/NebSvcMonitor.sh
+
 #Check to see if directory exists
 if [ ! -d "$goNebulasDir" ]; then
   printf "Directory %s is not set correctly.\n
