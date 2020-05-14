@@ -15,7 +15,7 @@ goNebulasDir=/home/neb/go-nebulas/
 
 #Set how often the status of .neb should be checked in seconds (default is 300, every 5 minutes).
 #This must also match the setting in the NebSvcMonitorSettings.inc config file for the variable $NSMSettings['delayBetweenReports']
-checkIntervals=60
+checkIntervals=300
 
 ##On autocheck, where and if to log data
 #suggested options:

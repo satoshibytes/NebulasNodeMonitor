@@ -87,7 +87,7 @@ $NSMSettings['nodeRestartIfLocalHeightNotEqualToExternal'] = true;
 
 //Notify the server every 5 minutes about your nodes status. If using the service provided by @satoshiBytes, keep it set to 300 - future feature and currently not available
 //Should be set to the cron job time (e.g. 5 minutes = 300 seconds).
-$NSMSettings['delayBetweenReports'] = 60; //Default 300;
+$NSMSettings['delayBetweenReports'] = 300; //Default 300;
 
 //If there are multiple neb processes found, stop and restart them.
 $NSMSettings['restartServiceIfMultipleProcFound'] = true; //true or false

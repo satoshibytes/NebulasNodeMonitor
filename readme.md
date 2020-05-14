@@ -29,11 +29,12 @@ Thus far, testing has been via a Debian based server running PHP 7.2. It should 
 * From the newly created __NebulasNodeMonitor__ directory, modify the directory setting within the file NebSvcMonitor.sh then setup the required symbolic links by entering __./NebSvcMonitor.sh install__
     * Check and fix any errors then return to the go-nebulas directory. From there, enter __./NebSvcMonitor.sh__ and it will remain active checking your node.
     * The timing of node verification can also be set within this file and must match the setting (in seconds) within the __NebSvcMonitorSettings.inc__ file for proper operation.
+* Set the permission for the files __NebSvcMonitor.sh__ and __NebSvcMonitor.php__ via chmod +x NebSvcMonitor.sh && chmod +x NebSvcMonitor.php
 #### Auto start & verification
 * If you would like to have this service start at boot, you can set a cron job by entering __crontab -e__ and add __@reboot /path/to/go-nebulas/NebSvcMonitor.sh__ at the bottom of the file.
 * You can also setup a cron job to verify the service monitor is functioning properly. To do this, enter: __crontab -e__ and add __*/5 * * * * /path/to/go-nebulas/NebSvcMonitor.sh checkStatus__ to the bottom of your cron job list
 
-_Note: /path/to/go-nebulas/ must be the actual path to your go-nebulas install. It probably looks something like /home/neb/go-nebulas/NebSvcMonitor.php_
+_Note: /path/to/go-nebulas/ must be the actual path to your go-nebulas install. It probably looks something like /home/neb/go-nebulas/NebSvcMonitor.sh_
     
 ## Future Features ##
 * I plan to have the program call a 3rd party server to verify the server is still live and if not, send a message to the operator.

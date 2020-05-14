@@ -28,6 +28,8 @@ if (isset($argv[1])) { //&& $argv[2] == 'fromBash'
 //Include the settings
 $NSMSettings = [];
 require_once "NebSvcMonitorSettings.inc";
+set_time_limit($NSMSettings['delayBetweenReports'] - 10);
+
 //Call the class
 $NebulasServiceMonitor = new NebSvcMonitor($NSMSettings);
 //Do a process as defined via command line4
@@ -698,9 +700,13 @@ class NebSvcMonitor
 		if (!$procList || $procList == 'kill') { //If we do not receive any info, grab the procId and continue
 			$procList = $this->nodeProcId('procId');
 		}
-		$this->verboseLog(print_r($procList, true));
-
-		if (is_array($procList)) { //Expecting array (even if it's just one process to kill)
+		$test = print_r($procList, true);
+		$this->verboseLog($test);
+		if (!$procList) {
+			$this->nodeStatus = 'offline';
+			$this->verboseLog('offline');
+			$this->nodeProcStatus = 'killed';
+		} else if (is_array($procList)) { //Expecting array (even if it's just one process to kill)
 			foreach ($procList as $thisProc) {
 				$thisProc = preg_replace('/[ ]{2,}/', ' ', $thisProc);//clean double spaces
 				$thisProcExp = explode(' ', $thisProc);
