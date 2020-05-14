@@ -22,16 +22,18 @@ __Settings must be configured via the commented NebSvcMonitorSettings.inc file._
 
 ## Installation ##
 Thus far, testing has been via a Debian based server running PHP 7.2. It should work with other base operating systems as well such as Ubuntu (based on Debian) and CentOS.
-* Installation of PHP 7.2 and PHP-CURL. This can vary based on system and package manager. 
-    * For example, Debian based systems can istall PHP via sudo user with the command sudo __apt install php7.2-cli php7.2-curl__
-* Clone or copy this repo into your go-nebulas directory: From your go-nebulas directory: git clone https://github.com/satoshibytes/NebulasNodeMonitor.git
+* Installation of PHP 7.2-cli and PHP-CURL. This can vary based on system and package manager. 
+    * For example, Debian based systems can istall PHP via sudo user with the command __sudo apt install php7.2-cli php7.2-curl__
+* Clone or copy this repo into your go-nebulas directory: From your go-nebulas directory: __git clone https://github.com/satoshibytes/NebulasNodeMonitor.git__
 * Review the settings stored in the file __NSMSettings.inc__ and adjust accordingly to your requirements. The document is comment and should be easy to edit.
 * From the newly created __NebulasNodeMonitor__ directory, modify the directory setting within the file NebSvcMonitor.sh then setup the required symbolic links by entering __./NebSvcMonitor.sh install__
     * Check and fix any errors then return to the go-nebulas directory. From there, enter __./NebSvcMonitor.sh__ and it will remain active checking your node.
     * The timing of node verification can also be set within this file and must match the setting (in seconds) within the __NebSvcMonitorSettings.inc__ file for proper operation.
-    * If you would like to have this service start at boot, you can set a cron job by entering __crontab -e__ and add __@reboot /path/to/go-nebulas/NebSvcMonitor.sh__ at the bottom of the file.
+#### Auto start & verification
+* If you would like to have this service start at boot, you can set a cron job by entering __crontab -e__ and add __@reboot /path/to/go-nebulas/NebSvcMonitor.sh__ at the bottom of the file.
+* You can also setup a cron job to verify the service monitor is functioning properly. To do this, enter: __crontab -e__ and add __*/5 * * * * /path/to/go-nebulas/NebSvcMonitor.sh checkStatus__ to the bottom of your cron job list
 
-_Note: /path/to/go-nebulas/ must be the actual path to your go-nebulas install. It probably looks something like /home/neb/go-nebulas/NebulasServiceMonitor.php_
+_Note: /path/to/go-nebulas/ must be the actual path to your go-nebulas install. It probably looks something like /home/neb/go-nebulas/NebSvcMonitor.php_
     
 ## Future Features ##
 * I plan to have the program call a 3rd party server to verify the server is still live and if not, send a message to the operator.
@@ -40,7 +42,7 @@ _Note: /path/to/go-nebulas/ must be the actual path to your go-nebulas install. 
 * Simpler installer.
 
 ### This is still a work in progress ###
-This repo is a work in progress and is in testing on a live node. It's however not recommended for use on a live node.
+This program is a work in progress and is being in testing on a live node. It's however not recommended for use on a live community nodes at this time.
 
 If used in a live environment, you can set the option to disable server restarts so it will only observe the system and send notification -  it will not intervene with operation.
 

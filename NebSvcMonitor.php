@@ -27,7 +27,7 @@ if (isset($argv[1])) { //&& $argv[2] == 'fromBash'
 
 //Include the settings
 $NSMSettings = [];
-require_once getcwd() . "/NebSvcMonitorSettings.inc";
+require_once "NebSvcMonitorSettings.inc";
 //Call the class
 $NebulasServiceMonitor = new NebSvcMonitor($NSMSettings);
 //Do a process as defined via command line4
@@ -48,6 +48,7 @@ class NebSvcMonitor
 	private $localLogHistory; //Store the local log in a array
 	private $localLogLastCall; //Store the local log in a array
 	private $synchronizedBehindCount; //Variable to store how long a node has been behind
+	private $synchronizedBehindCountIncreased; //Watch for double increments
 	private $externalNebState; //Store the nebstate from external API
 	private $localLogLatest;//
 	private $severityMessageArray = [0 => 'success', 1 => 'info', 2 => 'notify', 3 => 'warn', 4 => 'error'];
@@ -128,11 +129,16 @@ class NebSvcMonitor
 
 	private function verboseLog($val)
 	{//Primarily used for debugging - can be disabled in the config
-		if ($this->NSMSettings['verbose'] == 'echo') {
-			echo $this->logEchoNumber . ' ' . $val . "\n";
+		$now = date("m j, Y, H:i:s");
+		if ($this->NSMSettings['verbose'] != false) {
+			$logEntry = $now . ': ' . $this->logEchoNumber . ' ' . $val . "\n";
 			$this->logEchoNumber++;
+			if ($this->NSMSettings['verbose'] == 'echo') {
+				echo $logEntry;
+			} else {//Write to log
+				file_put_contents($this->NSMSettings['verbose'], $logEntry, FILE_APPEND);
+			}
 		}
-
 	}
 
 	private function statusCheck()
@@ -199,15 +205,17 @@ class NebSvcMonitor
 						$this->verboseLog($msg);
 					} else {//Node is behind
 						$diff = $this->externalNebState['result']['height'] - $this->nodeBlockHeight;
+						if ($this->NSMSettings['nodeRestartIfLocalHeightNotEqualToExternal'] == true)
+							$this->synchronizedBehindCount = $this->localLogLastCall['synchronizedBehindCount'] + 1;//Increase the behind count by one since we are not properly synced up.
 						$msg = "The local node states that it is in sync but is behind when compared to external API results.\n 
-                            Local Height: $this->nodeBlockHeight,| External Height: {$this->externalNebState['result']['height']} | Diff: {$diff}";
+                            Local Height: $this->nodeBlockHeight,| External Height: {$this->externalNebState['result']['height']} | Diff: {$diff} | Behind Count: {$this->synchronizedBehindCount}";
+
 						$this->messages[] = [
 							'function'    => 'statusCheck',
 							'messageRead' => $msg,
 							'result'      => 'success',
 							'time'        => time()];
 						$this->verboseLog($msg);
-
 					}
 				} else {
 					$msg = "The node is reporting to be synced but the external api node was not available for verification.";
@@ -226,14 +234,14 @@ class NebSvcMonitor
 				if ($this->localLogLastCall['synchronized'] == false) {//The last check resulted in a failed synchronized result. Let's see if the block height is increasing at a proper rate.
 					//First see if the height increased at all
 					if ($this->localLogLastCall['blockHeight'] == $this->nodeBlockHeight) {//The block height did not increase.
-						$msg = "The block height did not increase from the last check. Setting restart required to true. Log Last Height: {$this->localLogLastCall['blockHeight']} | Current Height: {$this->nodeBlockHeight}.";
+						$msg = "The block height did not increase from the last check. Log Last Height: {$this->localLogLastCall['blockHeight']} | Current Height: {$this->nodeBlockHeight}.";
 						$this->messages[] = [
 							'function'    => 'statusCheck',
 							'messageRead' => $msg,
 							'result'      => 'error',
 							'time'        => time()];
 						$this->verboseLog($msg);
-						$this->nodeRestart = true;
+						//$this->nodeRestart = true;
 					} else { //The block height did increase - let's see if its within acceptable rate
 						//What is the minimum amount of blocks generated we should accept.
 						$minBlocksGen = ($this->NSMSettings['delayBetweenReports'] / 15) + (($this->NSMSettings['delayBetweenReports'] / 15) * ($this->NSMSettings['nodeSyncMinBlockCountIncreasePercentage'] / 100));//TODO look at this line closer
@@ -260,18 +268,6 @@ class NebSvcMonitor
 							];
 							$this->verboseLog($msg);
 						}
-						if ($this->synchronizedBehindCount > $this->NSMSettings['nodeBehindRestartCount'] && $this->NSMSettings['nodeRestartIfSyncSpeedFast'] == true) { //The node is behind for the max amount of checks
-							$msg = "The node is behind for the max amount of checks. Setting restart required to true. Local Height: $this->nodeBlockHeight,| External Height: {$this->externalNebState['result']['height']}";
-							$this->messages[] = [
-								'function'    => 'statusCheck',
-								'messageRead' => $msg,
-								'result'      => 'error',
-								'time'        => time()
-							];
-							$this->verboseLog($msg);
-							$this->synchronizedBehindCount = 0;//Set to 0 to stop continuous restart
-							$this->nodeRestart = true;//Set the node to restart
-						}
 					}
 				}
 			}
@@ -284,7 +280,6 @@ class NebSvcMonitor
 				'time'        => time()
 			];
 			$this->verboseLog($msg);
-
 			if ($this->NSMSettings['restartServiceIfNotFound'] == true) {//Should we restart the node?
 				$this->nodeRestart = true;//Set the node to restart
 				$this->nodeProcId('kill');//See if the node is online and if so, terminate it.
@@ -298,6 +293,18 @@ class NebSvcMonitor
 				];
 				$this->verboseLog($msg);
 			}
+		}
+		if ($this->synchronizedBehindCount > $this->NSMSettings['nodeBehindRestartCount']) { //The node is behind for the max amount of checks
+			$msg = "The node is behind for the max amount of checks. Setting restart required to true. Local Height: $this->nodeBlockHeight,| External Height: {$this->externalNebState['result']['height']}";
+			$this->messages[] = [
+				'function'    => 'statusCheck',
+				'messageRead' => $msg,
+				'result'      => 'error',
+				'time'        => time()
+			];
+			$this->verboseLog($msg);
+			$this->synchronizedBehindCount = 0;//Set to 0 to stop continuous restart
+			$this->nodeRestart = true;//Set the node to restart
 		}
 		if ($this->nodeRestart == true) { //nodeProcId found no running neb functions - restart the service
 			if ($this->NSMSettings['enableRestartService'] == true)
@@ -330,7 +337,7 @@ class NebSvcMonitor
 	{   //Store the current settings in a local file to verify the node status/
 		//Default is to read but can specify write and erase.
 		if ($req == 'erase') {
-			unlink($this->NSMSettings['localLogFile']);
+			unlink($this->NSMSettings['localDataFile']);
 		} else if ($req == 'writeInitial') {
 			$this->showStatus();
 			$this->localLogLatest[time()] = [//New data to add to the log
@@ -345,16 +352,16 @@ class NebSvcMonitor
 			                                 'messageSeverityLevel'    => $this->severityMessageArray[$this->severityMessageMax],
 			                                 'ExternalAPIStatus'       => $this->externalNebState,
 			                                 'messages'                => $this->messages];
-			file_put_contents($this->NSMSettings['localLogFile'], json_encode($this->localLogLatest)); //Store the log
-			chmod($this->NSMSettings['localLogFile'], 0755);
+			file_put_contents($this->NSMSettings['localDataFile'], json_encode($this->localLogLatest)); //Store the log
+			chmod($this->NSMSettings['localDataFile'], 0755);
 			$req = 'write';
 		}
 
-		if (!file_exists($this->NSMSettings['localLogFile'])) { //Set the initial file if it does not exist
+		if (!file_exists($this->NSMSettings['localDataFile'])) { //Set the initial file if it does not exist
 			$this->readWriteLog('writeInitial');
 		}
 		//Get the log file
-		$statusLogArr = json_decode(file_get_contents($this->NSMSettings['localLogFile']), true); //Need to get data regardless
+		$statusLogArr = json_decode(file_get_contents($this->NSMSettings['localDataFile']), true); //Need to get data regardless
 		if ($req == 'read') { //Get the status from the file. Stored in JSON array.
 			$this->localLogHistory = $statusLogArr;
 			$key = array_key_first($statusLogArr);
@@ -385,7 +392,7 @@ class NebSvcMonitor
 			if ($cnt >= $this->NSMSettings['eventsToStoreLocally']) { //See if the array has more inputs then specified in the config
 				unset($NewLog[array_key_last($NewLog)]);
 			}
-			file_put_contents($this->NSMSettings['localLogFile'], json_encode($NewLog)); //Store the log
+			file_put_contents($this->NSMSettings['localDataFile'], json_encode($NewLog)); //Store the log
 		}
 	}
 
@@ -609,8 +616,10 @@ class NebSvcMonitor
 	private function nodeProcId($req = null)
 	{ //Find the process id on the server and verify that there is only one process running (not counting children).
 		$findNebProcGrep = '[' . $this->NSMSettings['nebStartServiceCommand'][0] . ']' . substr($this->NSMSettings['nebStartServiceCommand'], 1); //Set the search string
-		$findNebProc = shell_exec("ps -ux | grep \"$findNebProcGrep\""); //Find the .neb process based on the $settings['restartServiceCommand'] setting
-		$msg = "ps -ux | grep \"$findNebProcGrep\" \n$findNebProc";
+		$findNebProc = shell_exec("ps -ef | grep \"$findNebProcGrep\" | grep -v \"grep\" | grep -v \"checkStatus\" | grep -v \"tail\" | grep -v \"kill\""); //Find the .neb process based on the $settings['restartServiceCommand'] setting
+		//ps -ef | grep \"$findNebProcGrep\" | grep -v \"grep\" | grep -v \"checkStatus\" | grep -v \"tail\" | grep -v \"kill\"
+		//ps -ux | grep \"$findNebProcGrep\""
+		$msg = "ps -ef | grep \"$findNebProcGrep\" | grep -v \"grep\" | grep -v \"checkStatus\" | grep -v \"tail\" | grep -v \"kill\"";
 		$this->verboseLog($msg);
 
 		if ($findNebProc) { //Process found
@@ -689,6 +698,8 @@ class NebSvcMonitor
 		if (!$procList || $procList == 'kill') { //If we do not receive any info, grab the procId and continue
 			$procList = $this->nodeProcId('procId');
 		}
+		$this->verboseLog(print_r($procList, true));
+
 		if (is_array($procList)) { //Expecting array (even if it's just one process to kill)
 			foreach ($procList as $thisProc) {
 				$thisProc = preg_replace('/[ ]{2,}/', ' ', $thisProc);//clean double spaces

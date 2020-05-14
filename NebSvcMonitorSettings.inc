@@ -62,7 +62,7 @@ $NSMSettings['restartMinFreeSwapPercent'] = true;
  * If set to 1, it will be restarted every time it's not synced.
  * If set to 0, the node will not be restarted
 */
-$NSMSettings['nodeBehindRestartCount'] = 3;
+$NSMSettings['nodeBehindRestartCount'] = 15;
 
 /*
  * If the node is not synced, how many blocks are acceptable per check to consider the node actively proceeding the sync process.
@@ -79,16 +79,21 @@ $NSMSettings['nodeSyncMinBlockCountIncreasePercentage'] = 10;
  */
 $NSMSettings['nodeRestartIfSyncSpeedFast'] = false;
 
+/*
+ * If the local node height is falling behind the external api block height, restart the node (after the config nodeBehindRestartCount is reached)
+ */
+$NSMSettings['nodeRestartIfLocalHeightNotEqualToExternal'] = true;
+
 
 //Notify the server every 5 minutes about your nodes status. If using the service provided by @satoshiBytes, keep it set to 300 - future feature and currently not available
 //Should be set to the cron job time (e.g. 5 minutes = 300 seconds).
-$NSMSettings['delayBetweenReports'] = 300;// 300;
+$NSMSettings['delayBetweenReports'] = 60; //Default 300;
 
 //If there are multiple neb processes found, stop and restart them.
 $NSMSettings['restartServiceIfMultipleProcFound'] = true; //true or false
 
 //How long in seconds to wait to verify the process restarted
-$NSMSettings['restartServiceDelayCheck'] = 30;
+$NSMSettings['restartServiceDelayCheck'] = 30; //Default 30
 
 /*
  * What command to execute to restart the service? Be sure to use full directory location.
@@ -98,7 +103,7 @@ $NSMSettings['restartServiceDelayCheck'] = 30;
 $NSMSettings['goNebulasDirectory'] = '/home/neb/go-nebulas/';
 
 //Select the network to use this service as - it modifies the startup config.
-$NSMSettings['selectedNetwork'] = 'testnet';
+$NSMSettings['selectedNetwork'] = 'testnet'; //testnet or mainnet - is used to set options in the config
 
 //Get current block height from external source
 $NSMSettings['externalApiURL'] = 'https://' . $NSMSettings['selectedNetwork'] . '.nebulas.io';//'https://mainnet.nebulas.io';
@@ -118,11 +123,12 @@ $NSMSettings['maxRestartAttempts'] = 5;
 $NSMSettings['nebListenPort'] = '8685';
 
 //We are going to store some log information locally for proper operation
-$NSMSettings['localLogFile'] = $NSMSettings['goNebulasDirectory'] . 'NebSvcMonitor.log';
+$NSMSettings['localDataFile'] = $NSMSettings['goNebulasDirectory'] . 'NebSvcMonitor.data';
 
 //How many events to store locally. This includes messages, block height, etc... in a JSON array.
 // Minimum is 1 so to check that block height is increasing.
 $NSMSettings['eventsToStoreLocally'] = 20;
 
-//In addition to storing any messages in the log, the readable messages can be directed to immediately echo. //TODO add option to put in log file
-$NSMSettings['verbose'] = 'echo';
+//Display via echo or add to log entries.
+$NSMSettings['verbose'] = $NSMSettings['goNebulasDirectory'] . 'NebSvcMonitor.log';//echo or logFile.log
+//$NSMSettings['verbose'] = 'echo';//echo or logFile.log
