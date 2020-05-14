@@ -74,9 +74,9 @@ fi
 PHP=$(which php)
 printf "Begin NebSvcMonitor.sh\n
 PHP execution location: %s\n
-The set go-nebulas directory: %s" "$PHP" "$goNebulasDir"
+The set go-nebulas directory: %s\n" "$PHP" "$goNebulasDir"
 while true; do
-  echo Running NebSvcMonitor
+  printf "Running NebSvcMonitor\n"
   begin=$(date +%s)
   "$PHP" "$goNebulasDir"NebSvcMonitor.php &
   end=$(date +%s)

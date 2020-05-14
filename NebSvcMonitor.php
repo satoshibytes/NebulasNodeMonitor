@@ -618,10 +618,10 @@ class NebSvcMonitor
 	private function nodeProcId($req = null)
 	{ //Find the process id on the server and verify that there is only one process running (not counting children).
 		$findNebProcGrep = '[' . $this->NSMSettings['nebStartServiceCommand'][0] . ']' . substr($this->NSMSettings['nebStartServiceCommand'], 1); //Set the search string
-		$findNebProc = shell_exec("ps -ef | grep \"$findNebProcGrep\" | grep -v \"grep\" | grep -v \"checkStatus\" | grep -v \"tail\" | grep -v \"kill\""); //Find the .neb process based on the $settings['restartServiceCommand'] setting
+		$findNebProc = shell_exec("ps -ef | grep \"$findNebProcGrep\" | grep -v \"grep\" | grep -v \"checkStatus\" | grep -v \"tail\" | grep -v \"kill\" | grep -v \".sh\""); //Find the .neb process based on the $settings['restartServiceCommand'] setting
 		//ps -ef | grep \"$findNebProcGrep\" | grep -v \"grep\" | grep -v \"checkStatus\" | grep -v \"tail\" | grep -v \"kill\"
 		//ps -ux | grep \"$findNebProcGrep\""
-		$msg = "ps -ef | grep \"$findNebProcGrep\" | grep -v \"grep\" | grep -v \"checkStatus\" | grep -v \"tail\" | grep -v \"kill\"";
+		$msg = "ps -ef | grep \"$findNebProcGrep\" | grep -v \"grep\" | grep -v \"checkStatus\" | grep -v \"tail\" | grep -v \"kill\" | grep -v \".sh\"";
 		$this->verboseLog($msg);
 
 		if ($findNebProc) { //Process found
@@ -742,7 +742,7 @@ class NebSvcMonitor
 		$restartServiceDelayCheck = $this->NSMSettings['restartServiceDelayCheck'] + ($this->restartAttempts * 5);//Just in case it takes longer to start neb.
 		$this->nodeProcId('kill');//Kill any existing processes - Make sure all processes are terminated
 		putenv('export LD_LIBRARY_PATH=$CUR_DIR/native-lib:$LD_LIBRARY_PATH');//Set evn variables for .neb - not needed for all systems but safe than sorry.
-		shell_exec($this->NSMSettings['nebStartServiceCommand'] . ' > /dev/null &'); //Execute startup command and direct the output to null
+		exec($this->NSMSettings['nebStartServiceCommand'] . '&'); //Execute startup command and direct the output to null
 		$this->verboseLog($this->NSMSettings['nebStartServiceCommand'] . " > /dev/null &");
 		//echo 'export LD_LIBRARY_PATH=$CUR_DIR/native-lib:$LD_LIBRARY_PATH' . "\n" . $this->NSMSettings['nebStartServiceCommand . ' > /dev/null &';
 		sleep($restartServiceDelayCheck); //wait for the node to come online before checking the status
