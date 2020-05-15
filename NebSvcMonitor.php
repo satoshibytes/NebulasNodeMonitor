@@ -395,7 +395,6 @@ class NebSvcMonitor
 			if ($this->NSMSettings['restartMinFreeMemoryPercent'] == true) {
 				$this->nodeRestart = true;
 				$messageExtended = " Node will reboot based on config settings";
-
 			}
 			$msg = "Memory utilization exceeded specified minimum free memory amount percent. Free memory: $freeMemoryPercent." . $messageExtended;
 			$this->messages[] = [
@@ -445,7 +444,6 @@ class NebSvcMonitor
 		if (json_last_error() == JSON_ERROR_NONE && $this->nodeStatusRPC == 'online') { //Node is online - lets check the status
 			$this->synchronized = $nodeStatusArray['result']['synchronized'];
 			$this->nodeBlockHeight = $nodeStatusArray['result']['height'];
-			$this->nodeRestart = false;
 			$this->nodeStatusRPC = 'online';
 			$msg = "Node Online. Block height: {$nodeStatusArray['result']['height']}";
 			$this->messages[] = [
