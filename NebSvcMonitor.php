@@ -382,7 +382,8 @@ class NebSvcMonitor
 			$memoryUsageDataArray[$thisName] = $thisSize;
 			unset($thisSizeType, $thisSize, $thisName);
 		}
-		$freeMemoryPercent = ($memoryUsageDataArray['freeMemory'] / $memoryUsageDataArray['totalMemory']) * 100;
+		$realFreeMemory = $memoryUsageDataArray['totalMemory'] - $memoryUsageDataArray['usedMemory'];
+		$freeMemoryPercent = ($realFreeMemory / $memoryUsageDataArray['totalMemory']) * 100;
 		$freeSwapPercent = ($memoryUsageDataArray['freeSwap'] / $memoryUsageDataArray['totalSwap']) * 100;
 		$this->serverHWUtilization['memory'] = ['systemMemory'      => $memoryUsageDataArray['totalMemory'],
 		                                        'freeMemory'        => $memoryUsageDataArray['freeMemory'],
@@ -600,7 +601,7 @@ class NebSvcMonitor
 					'time'        => time()
 				];
 				$this->verboseLog($msg);
-			} else{
+			} else {
 				$msg = 'Shutdown process completed. - ' . $this->nodeProcRunningCount;
 				$this->messages[] = [
 					'function'    => 'startNeb',

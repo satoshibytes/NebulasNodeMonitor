@@ -111,7 +111,6 @@ $NSMSettings['externalApiURL'] = 'https://' . $NSMSettings['selectedNetwork'] . 
 /*The startup command along with what config to use. Please note - due to how the nebulas service is designed, the full directory of your configuration file must be included. If you clone this file into a sub-directory of go-nebulas such as NebulasNodeMonitor if the repo is cloned, the following config would be used with the user neb executing nebulas.
  * Example:  /home/neb/go-nebulas/neb -c /home/neb/go-nebulas/mainnet/conf/config.conf
 */
-//$NSMSettings['nebStartServiceCommand = $NSMSettings['goNebulasDirectory . 'neb -c ' . $NSMSettings['goNebulasDirectory . $NSMSettings['selectedNetwork . '/conf/config.conf';
 $NSMSettings['nebStartServiceCommand'] = '/home/neb/go-nebulas/neb -c ' . $NSMSettings['selectedNetwork'] . '/conf/config.conf';
 //    /home/neb/go-nebulas/neb -c /home/neb/go-nebulas/mainnet/conf/config.conf
 //    /home/neb/go-nebulas/neb -c mainnet/conf/config.conf
