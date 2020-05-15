@@ -93,7 +93,7 @@ $NSMSettings['delayBetweenReports'] = 300; //Default 300;
 $NSMSettings['restartServiceIfMultipleProcFound'] = true; //true or false
 
 //How long in seconds to wait to verify the process restarted
-$NSMSettings['restartServiceDelayCheck'] = 30; //Default 30
+$NSMSettings['restartServiceDelayCheck'] = 12; //Default 30
 
 /*
  * What command to execute to restart the service? Be sure to use full directory location.
@@ -130,5 +130,5 @@ $NSMSettings['localDataFile'] = $NSMSettings['goNebulasDirectory'] . 'NebSvcMoni
 $NSMSettings['eventsToStoreLocally'] = 20;
 
 //Display via echo or add to log entries.
-$NSMSettings['verbose'] = $NSMSettings['goNebulasDirectory'] . 'NebSvcMonitor.log';//echo or logFile.log
-//$NSMSettings['verbose'] = 'echo';//echo or logFile.log
+//$NSMSettings['verbose'] = $NSMSettings['goNebulasDirectory'] . 'NebSvcMonitor.log';//echo or logFile.log
+$NSMSettings['verbose'] = 'echo';//echo or logFile.log

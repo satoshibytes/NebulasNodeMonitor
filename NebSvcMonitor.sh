@@ -21,9 +21,9 @@ checkIntervals=300
 #suggested options:
 # /dev/null
 # NebSvcMonLog_sh.txt
-restartLogHandle="NebSvcMonLog_sh.log"
+restartLogHandle="NebSvcMonLog_shRestart.log"
+messageLog="NebSvcMonLog_sh.log"
 ##End of config
-
 
 printf "Entered NebSvcMonitor.sh \n"
 ##Check to see if any variables were passed to the script
@@ -78,7 +78,7 @@ The set go-nebulas directory: %s\n" "$PHP" "$goNebulasDir"
 while true; do
   printf "Running NebSvcMonitor\n"
   begin=$(date +%s)
-  "$PHP" "$goNebulasDir"NebSvcMonitor.php &
+  "$PHP" "$goNebulasDir"NebSvcMonitor.php >"$goNebulasDir""$messageLog" &
   end=$(date +%s)
   opTime=$((end - begin))
   printf "Completed. Operation took: %s seconds. Next check will occur in %s seconds\n\n" "$opTime" "$checkIntervals"
