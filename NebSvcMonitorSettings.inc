@@ -24,7 +24,7 @@ $NSMSettings['reportEmailFrom'] = '';
  * Set the integer below of when you should receive notification about a problem.
  * Default is '2'
  */
-$NSMSettings['severityLevelMessageSend'] = '2';
+$NSMSettings['severityLevelMessageSend'] = '3';
 
 //What is the name of the node
 $NSMSettings['nodeName'] = 'Node-Name';
@@ -37,7 +37,7 @@ $NSMSettings['enableRestartService'] = true;
 
 //Server limits before triggering errors
 //The minimum amount of free ram available before triggering a error. For example if set to 20, the minimum amount of free ram must be 20%.
-$NSMSettings['minFreeMemoryPercent'] = '20';
+$NSMSettings['minFreeMemoryPercent'] = '15';
 
 //The minimum amount of free swap space available before triggering a error. For example if set to 20, the minimum amount of free ram must be 20%.
 $NSMSettings['minFreeSwapPercent'] = '20';
@@ -62,7 +62,7 @@ $NSMSettings['restartMinFreeSwapPercent'] = true;
  * If set to 1, it will be restarted every time it's not synced.
  * If set to 0, the node will not be restarted
 */
-$NSMSettings['nodeBehindRestartCount'] = 15;
+$NSMSettings['nodeBehindRestartCount'] = 6;
 
 /*
  * If the node is not synced, how many blocks are acceptable per check to consider the node actively proceeding the sync process.
@@ -103,7 +103,7 @@ $NSMSettings['restartServiceDelayCheck'] = 12; //Default 30
 $NSMSettings['goNebulasDirectory'] = '/home/neb/go-nebulas/';
 
 //Select the network to use this service as - it modifies the startup config.
-$NSMSettings['selectedNetwork'] = 'testnet'; //testnet or mainnet - is used to set options in the config
+$NSMSettings['selectedNetwork'] = 'mainnet'; //testnet or mainnet - is used to set options in the config
 
 //Get current block height from external source
 $NSMSettings['externalApiURL'] = 'https://' . $NSMSettings['selectedNetwork'] . '.nebulas.io';//'https://mainnet.nebulas.io';
