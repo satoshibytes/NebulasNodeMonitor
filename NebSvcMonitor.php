@@ -14,7 +14,7 @@
  * ->php NebSvcMonitor.php startNeb
  * ->php NebSvcMonitor.php status
  *
- *
+ * //TODO manage log size (either rotate or concat)
  *
  *
  */
@@ -38,7 +38,11 @@ $NebulasServiceMonitor->doProcess($doProcess);
 class NebSvcMonitor
 {// extends NSMSettings
 	//Define initial variables
-	private $nodeRestart = false; //does the node need to be restarted - set initial to false
+	private $nodeRestartRequested = false; //does the node need to be restarted - set initial to false
+	private $emergencyRestart = false;
+	private $readableMessages;//Store the readable messages separately to send via email
+	private $repeatedRestartRequests = 0;//Number of requests made in a row for a restart - this reduces contiguous restarts
+	private $performNodeRestart;//Confirms a node restart will be performed (as long as allowed in the config)
 	private $restartAttempts = 0; //count how many restart attempts have been made
 	private $messages = []; //store any messages from the processes. All messages contain a result field which can be either success, warn, fail.
 	private $nodeStatusRPC; //Current node status - Can be online or offline
@@ -83,6 +87,8 @@ class NebSvcMonitor
 
 	public function doProcess($doThis) //This are the available actions.
 	{//readLog
+		$this->verboseLog("Called NebSvcMonitor.php $doThis", 'info');
+
 		switch ($doThis) {
 			case 'testEmail':
 				$this->readWriteLog('read');
@@ -129,6 +135,7 @@ class NebSvcMonitor
 				print_r($this->about);
 				break;
 		}
+		$this->cleanLogFile();
 	}
 
 	private function statusCheck()
@@ -156,25 +163,21 @@ class NebSvcMonitor
 		 *
 		 * Note: This function is what will decide if the node requires a restart.
 		 *
-		 * Additional feature: check block height vs other nodes.
+		 * Additional feature:
 		 *  Check hdd space on partition where blocks are located.
 		 */
-		$this->verboseLog("## Entered statusCheck ##");
+		$this->verboseLog("## Entered statusCheck ##", 'info');
 		//Get the server hardware status
-		$this->verboseLog("serverStatus");
+		$this->verboseLog("serverStatus", 'info');
 		$this->serverStatus();
 		//First check if node is synced.
-		$this->verboseLog("nodeStatusRPC");
+		$this->verboseLog("nodeStatusRPC", 'info');
 		$this->nodeStatusRPCCheck();
-		$this->verboseLog("getExternalAPIData");
+		$this->verboseLog("getExternalAPIData", 'info');
 		$this->getExternalAPIData();
 		$this->readWriteLog('read');        //Get the historical log status.
 
-		$this->verboseLog("Node synced:{$this->synchronized}\n
-		Block Height: {$this->nodeBlockHeight}\n
-		Node Status: {$this->nodeStatusRPC}\n
-		External API Block Height: {$this->externalNebState['result']['height']}\n
-		External API Synced: {$this->externalNebState['result']['synchronized']}");
+		$this->verboseLog("Node synced:{$this->synchronized}\nBlock Height: {$this->nodeBlockHeight}\nNode Status: {$this->nodeStatusRPC}\nExternal API Block Height: {$this->externalNebState['result']['height']}\nExternal API Synced: {$this->externalNebState['result']['synchronized']}", 'info');
 
 		if ($this->nodeStatusRPC == 'online') { //Node is running //TODO verify this entire section
 			$externalNebStateBlockHeight = $this->externalNebState['result']['height'];
@@ -196,7 +199,7 @@ class NebSvcMonitor
 							'time'        => time()
 						];
 						$this->synchronizedBehindCount = 0; //Set the count to 0 for the current log status
-						$this->verboseLog($msg);
+						$this->verboseLog($msg, 'info');
 					} else {//Node is behind
 						$diff = $this->externalNebState['result']['height'] - $this->nodeBlockHeight;
 						if ($this->NSMSettings['nodeRestartIfLocalHeightNotEqualToExternal'] == true)
@@ -209,7 +212,7 @@ class NebSvcMonitor
 							'messageRead' => $msg,
 							'result'      => 'success',
 							'time'        => time()];
-						$this->verboseLog($msg);
+						$this->verboseLog($msg, 'info');
 					}
 				} else {
 					$msg = "The node is reporting to be synced but the external api node was not available for verification.";
@@ -219,9 +222,9 @@ class NebSvcMonitor
 						'result'      => 'notify',
 						'time'        => time()
 					];
-					$this->verboseLog($msg);
+					$this->verboseLog($msg, 'notify');
 				}
-				$this->verboseLog("-------------------");
+				//$this->verboseLog("-------------------",'');
 			} else {
 				//The node is reporting not being synced.
 				$this->synchronizedBehindCount = $this->localLogLastCall['synchronizedBehindCount'] + 1; //Increase the count
@@ -235,11 +238,11 @@ class NebSvcMonitor
 							'messageRead' => $msg,
 							'result'      => 'error',
 							'time'        => time()];
-						$this->verboseLog($msg);
+						$this->verboseLog($msg, 'error');
 						//$this->nodeRestart = true;
 					} else { //The block height did increase - let's see if its within acceptable rate
 						//What is the minimum amount of blocks generated we should accept.
-						$minBlocksGen = ($this->NSMSettings['delayBetweenReports'] / 15) + (($this->NSMSettings['delayBetweenReports'] / 15) * ($this->NSMSettings['nodeSyncMinBlockCountIncreasePercentage'] / 100));//TODO look at this line closer
+						$minBlocksGen = ($this->NSMSettings['delayBetweenReports'] / 15) + (($this->NSMSettings['delayBetweenReports'] / 15) * ($this->NSMSettings['nodeSyncMinBlockCountIncreasePercentage'] / 100));
 						$blockHeightIncreaseCount = $this->localLogLastCall['blockHeight'] + $minBlocksGen;
 						if ($this->nodeBlockHeight < $blockHeightIncreaseCount) {
 							//Block height increasing too slowly
@@ -250,7 +253,7 @@ class NebSvcMonitor
 								'messageRead' => $msg,
 								'result'      => 'warn',
 								'time'        => time()];
-							$this->verboseLog($msg);
+							$this->verboseLog($msg, 'warn');
 						} else {
 							//Block height is increasing fast enough
 							$msg = "Block height increasing at proper rate.";
@@ -261,7 +264,7 @@ class NebSvcMonitor
 								'result'      => 'info',
 								'time'        => time()
 							];
-							$this->verboseLog($msg);
+							$this->verboseLog($msg, 'info');
 						}
 					}
 				}
@@ -274,19 +277,20 @@ class NebSvcMonitor
 				'result'      => 'error',
 				'time'        => time()
 			];
-			$this->verboseLog($msg);
+			$this->verboseLog($msg, 'error');
 			if ($this->NSMSettings['restartServiceIfNotFound'] == true) {//Should we restart the node?
-				$this->nodeRestart = true;//Set the node to restart
+				$this->nodeRestartRequested = true;//Set the node to restart
 				$this->checkNodeProcRunning('kill');//See if the node is online and if so, terminate it.
 			} else {
 				$msg = "The NebSvcMonitor found the node to be offline however, it is set to not start in the config (restartServiceIfNotFound).";
+				$this->emergencyRestart = true;
 				$this->messages[] = [
 					'function'    => 'statusCheck',
 					'messageRead' => $msg,
 					'result'      => 'notify',
 					'time'        => time()
 				];
-				$this->verboseLog($msg);
+				$this->verboseLog($msg, 'notify');
 			}
 		}
 		if ($this->synchronizedBehindCount > $this->NSMSettings['nodeBehindRestartCount']) { //The node is behind for the max amount of checks
@@ -297,11 +301,43 @@ class NebSvcMonitor
 				'result'      => 'error',
 				'time'        => time()
 			];
-			$this->verboseLog($msg);
+			$this->verboseLog($msg, 'error');
 			$this->synchronizedBehindCount = 0;//Set to 0 to stop continuous restart
-			$this->nodeRestart = true;//Set the node to restart
+			$this->nodeRestartRequested = true;//Set the node to restart
 		}
-		if ($this->nodeRestart == true) { //nodeProcId found no running neb functions - restart the service
+		//$this->repeatedRestartRequests
+		/*
+		 * Restart requests are handled on multiple levels.
+		 * 1. emergencyRestart - restart the node without other checks since the node is down.
+		 * 2. restart the node if as long as the node was not recently restart as specified in the config restartAttemptsMinWait
+		 * 3. restarting can be disabled completely by setting the config enableRestartService to false. This is good for testing while still receiving emails.
+		 */
+		if ($this->nodeRestartRequested == true) {//Some part of the program requested a restart.
+			if ($this->repeatedRestartRequests == 0) {//No previous restarts - let's assume we need to restart the node.
+				$this->repeatedRestartRequests = $this->localLogHistory['repeatedRestartRequests'] + 1;//Increase the count by 1
+				$this->performNodeRestart = true;//We are confirming that we want to restart
+				$msg = "A node restart is required with no previous restart attempts for the last {$this->localLogHistory['repeatedRestartRequests']} checks.";
+				$this->messages[] = [
+					'function'    => 'statusCheck',
+					'messageRead' => $msg,
+					'result'      => 'notify',
+					'time'        => time()];
+				$this->verboseLog($msg, 'notify');
+			} else if (($this->repeatedRestartRequests >= $this->NSMSettings['restartAttemptsMinWait'])) {//Confirm we have not recently restarted the node
+				$this->performNodeRestart = true;//We are confirming that we want to restart
+				$this->repeatedRestartRequests = 0;
+				$msg = "A node restart is required due to reaching the max amount of delayed restarts of {$this->localLogHistory['repeatedRestartRequests']}.";
+				$this->messages[] = [
+					'function'    => 'statusCheck',
+					'messageRead' => $msg,
+					'result'      => 'notify',
+					'time'        => time()];
+				$this->verboseLog($msg, 'notify');
+			}
+		} else {//No restart required. Let's be sure to set repeatedRestartRequests to 0
+			$this->repeatedRestartRequests = 0;
+		}
+		if ($this->performNodeRestart == true || $this->emergencyRestart == true) { //nodeProcId found no running neb functions - restart the service
 			if ($this->NSMSettings['enableRestartService'] == true)
 				$this->startNeb();//Start neb
 			else {
@@ -312,7 +348,7 @@ class NebSvcMonitor
 					'result'      => 'notify',
 					'time'        => time()
 				];
-				$this->verboseLog($msg);
+				$this->verboseLog($msg, 'notify');
 			}
 		}
 		$this->readWriteLog('write'); //Write the data to the local log
@@ -323,13 +359,13 @@ class NebSvcMonitor
 
 	private function showStatus()
 	{//Show the status of the node when called
-		$this->verboseLog("## ENTER checkNodeProcRunning ##");
+		$this->verboseLog("## ENTER checkNodeProcRunning ##", 'info');
 		$this->checkNodeProcRunning();
-		$this->verboseLog("## ENTER serverStatus ##");
+		$this->verboseLog("## ENTER serverStatus ##", 'info');
 		$this->serverStatus(); //Check load and mem usage
-		$this->verboseLog("## ENTER nodeStatusRPCCheck ##");
+		$this->verboseLog("## ENTER nodeStatusRPCCheck ##", 'info');
 		$this->nodeStatusRPCCheck();//Get the node status via RPC req
-		$this->verboseLog("## ENTER getExternalAPIData ##");
+		$this->verboseLog("## ENTER getExternalAPIData ##", 'info');
 		$this->getExternalAPIData();
 	}
 
@@ -343,7 +379,7 @@ class NebSvcMonitor
 		                                     'avgLoad15min' => $loadRaw[2]];
 		if ($loadRaw[1] > $this->NSMSettings['restartMaxLoad5MinuteAvg']) {//Exceeded 5 min load average
 			if ($this->NSMSettings['restartIfMaxLoadExceeded']) {
-				$this->nodeRestart = true;
+				$this->nodeRestartRequested = true;
 				$messageExtended = " Node will reboot based on config settings";
 			}
 			$msg = "Average 5 minute server load average exceeded the specified max load. Current load: {$loadRaw[1]}." . $messageExtended;
@@ -353,7 +389,7 @@ class NebSvcMonitor
 				'result'      => 'error',
 				'time'        => time()
 			];
-			$this->verboseLog($msg);
+			$this->verboseLog($msg, 'error');
 			unset($messageExtended);
 		}
 		//End check the server load
@@ -393,7 +429,7 @@ class NebSvcMonitor
 		                                        'freeSwapPercent'   => $freeSwapPercent];
 		if ($freeMemoryPercent < $this->NSMSettings['minFreeMemoryPercent']) {//Exceeded free ram
 			if ($this->NSMSettings['restartMinFreeMemoryPercent'] == true) {
-				$this->nodeRestart = true;
+				$this->nodeRestartRequested = true;
 				$messageExtended = " Node will reboot based on config settings";
 			}
 			$msg = "Memory utilization exceeded specified minimum free memory amount percent. Free memory: $freeMemoryPercent." . $messageExtended;
@@ -403,11 +439,11 @@ class NebSvcMonitor
 				'result'      => 'error',
 				'time'        => time()
 			];
-			$this->verboseLog($msg);
+			$this->verboseLog($msg, 'error');
 		}
 		if ($freeSwapPercent < $this->NSMSettings['minFreeSwapPercent']) {//Exceeded free ram
 			if ($this->NSMSettings['restartMinFreeSwapPercent'] == true) {
-				$this->nodeRestart = true;
+				$this->nodeRestartRequested = true;
 				$messageExtended = " Node will reboot based on config settings";
 			}
 			$msg = "SWAP space utilization exceeded specified minimum free memory amount percent. Free swap amount: $freeSwapPercent." . $messageExtended;
@@ -417,7 +453,7 @@ class NebSvcMonitor
 				'result'      => 'error',
 				'time'        => time()
 			];
-			$this->verboseLog($msg);
+			$this->verboseLog($msg, 'error');
 		}
 		//End server memory utilization
 
@@ -429,7 +465,7 @@ class NebSvcMonitor
 			'result'      => 'info',
 			'time'        => time()
 		];
-		$this->verboseLog($msg);
+		$this->verboseLog($msg, 'info');
 		return null;//Results stored in pre-defined variables
 	}
 
@@ -452,7 +488,7 @@ class NebSvcMonitor
 				'result'      => 'success',
 				'time'        => time()
 			];
-			$this->verboseLog($msg);
+			$this->verboseLog($msg, 'info');
 
 			if ($this->synchronized != true) { //Check the status file for the last recorded status
 				$msg = 'Node not synchronized';
@@ -462,7 +498,7 @@ class NebSvcMonitor
 					'result'      => 'warn',
 					'time'        => time()
 				];
-				$this->verboseLog($msg);
+				$this->verboseLog($msg, 'warn');
 			}
 		} else { //No response from node - node is considered offline
 			//$this->restart = true;
@@ -472,8 +508,8 @@ class NebSvcMonitor
 			                     'messageRead' => $msg,
 			                     'result'      => 'error',
 			                     'time'        => time()];
-			$this->verboseLog($msg);
-			$this->nodeRestart = true;
+			$this->verboseLog($msg, 'error');
+			$this->nodeRestartRequested = true;
 		}
 		return null;//Results stored in pre-defined variables
 	}
@@ -481,7 +517,7 @@ class NebSvcMonitor
 	private function checkNodeProcRunning($req = null)
 	{ //Find the process id on the server and verify that there is only one process running (not counting children).
 		$findNebProcCount = shell_exec("ps -ef | grep \"neb -c\" | grep -v \"grep\" | grep -v \"checkStatus\" | grep -v \"tail\" | grep -v \"kill\" | grep -v \".sh\" |  wc -l"); //Find the .neb process based on the $settings['restartServiceCommand'] setting
-		$this->verboseLog("Running Processes: $findNebProcCount");
+		$this->verboseLog("Running Processes: $findNebProcCount", 'info');
 		$this->nodeProcRunningCount = $findNebProcCount;//set how many node processes are running
 		if ($req == 'count') {//Return live count of node
 			return $findNebProcCount;
@@ -494,7 +530,7 @@ class NebSvcMonitor
 				                     'result'      => 'error',
 				                     'time'        => time(),
 				                     'custom'      => "REQ: $req"];
-				$this->verboseLog($msg);
+				$this->verboseLog($msg, 'error');
 				$this->nodeStatusRPC = 'offline';
 			} else {
 				$msg = "Manual kill requested. Processes running: $findNebProcCount";
@@ -502,7 +538,7 @@ class NebSvcMonitor
 				                     'messageRead' => $msg,
 				                     'result'      => 'notify',
 				                     'time'        => time()];
-				$this->verboseLog($msg);
+				$this->verboseLog($msg, 'notify');
 				$this->killNebProc();
 			}
 		} else {
@@ -514,18 +550,14 @@ class NebSvcMonitor
 					'result'      => 'warn',
 					'time'        => time()
 				];
-				$this->verboseLog($msg);
+				$this->verboseLog($msg, 'warn');
 				if ($this->NSMSettings['restartServiceIfMultipleProcFound'] == true) {
-					$this->nodeRestart = true;
+					$this->nodeRestartRequested = true;
 					$this->killNebProc();
 				}
 			}
 		}
 		return null;//Results stored in pre-defined variables
-		//ps -ef | grep \"$findNebProcGrep\" | grep -v \"grep\" | grep -v \"checkStatus\" | grep -v \"tail\" | grep -v \"kill\"
-		//ps -ux | grep \"$findNebProcGrep\""
-		//	$msg = "Grep Command: ps -ef | grep \"neb -c\" | grep -v \"grep\" | grep -v \"checkStatus\" | grep -v \"tail\" | grep -v \"kill\" | grep -v \".sh\" | wc -l ";
-		//$findNebProcGrep = '[' . $this->NSMSettings['nebStartServiceCommand'][0] . ']' . substr($this->NSMSettings['nebStartServiceCommand'], 1); //Set the search string
 	}
 
 //////////////////////////////////////
@@ -538,7 +570,7 @@ class NebSvcMonitor
 		if ($checkNodeProcRunningCount == 0) {
 			$this->nodeStatusRPC = 'offline';
 			$this->nodeProcStatus = 'killed';
-			$this->verboseLog('Node killed - offline');
+			$this->verboseLog('Node killed - offline', 'info');
 			$msg = "Neb killed. Current processes running: $checkNodeProcRunningCount";
 			$this->messages[] = [
 				'function'    => 'killAllNeb',
@@ -557,28 +589,34 @@ class NebSvcMonitor
 		return null;
 	}
 
+	private function setEnvVariables()
+	{//Currently not used.
+		$currentDir = $exec = exec('echo $PWD');
+		//exec("export LD_LIBRARY_PATH=$currentDir/native-lib:\$LD_LIBRARY_PATH");//Set evn variables for .neb - not needed for all systems but safe than sorry.
+		//exec('export LD_LIBRARY_PATH');
+		//exec(' source $HOME/.bashrc');
+		//$this->verboseLog("completed putenv");
+	}
+
 	private function startNebProc()
 	{
-		$this->verboseLog('Entered startNebProc');
-		putenv('export LD_LIBRARY_PATH=$CUR_DIR/native-lib:$LD_LIBRARY_PATH');//Set evn variables for .neb - not needed for all systems but safe than sorry.
-		$this->verboseLog("completed putenv");
-		//$this->verboseLog($this->NSMSettings['nebStartServiceCommand'] . ' > /dev/null &');
-		$exec = $this->NSMSettings['nebStartServiceCommand'] . ' > /dev/null 2>&1 &';
+		$this->verboseLog('Entered startNebProc', 'info');
+		/*$exec = 'nohup ' . $this->NSMSettings['nebStartServiceCommand'] . '&';//Some environments may need a different startup command such as appending 2>&1 at the end  > /dev/null
 		$this->verboseLog("Command: " . $exec);
-		exec($exec, $res); //Execute startup command and direct the output to null
-		$this->verboseLog("Startup result: " . print_r($res));
+		$execOutput = exec($exec, $res); //Execute startup command and direct the output to null
+		$this->verboseLog("Startup result: " . print_r($res) . $execOutput);*/
+		$startNeb = exec('./NebSvcMonitor.sh startNeb');
+		$this->verboseLog($startNeb, 'command');
 		$restartServiceDelayCheck = $this->NSMSettings['restartServiceDelayCheck'] + ($this->restartAttempts * 5);//Just in case it takes longer to start neb.
 		sleep($restartServiceDelayCheck); //wait for the node to come online before checking the status
 		return null;
-		//$this->checkNodeProcRunning('kill');//Kill any existing processes - Make sure all processes are terminated
-		//echo 'export LD_LIBRARY_PATH=$CUR_DIR/native-lib:$LD_LIBRARY_PATH' . "\n" . $this->NSMSettings['nebStartServiceCommand . ' > /dev/null &';
 	}
 
 	private function startNeb() //Start the neb service
 	{
-		$this->verboseLog('Entered Starting Neb');
+		$this->verboseLog('Entered Starting Neb', 'info');
 		$this->checkNodeProcRunning('count');
-		$this->verboseLog("Node Process Count: {$this->nodeProcRunningCount}");
+		$this->verboseLog("Node Process Count: {$this->nodeProcRunningCount}", 'info');
 		if ($this->nodeProcRunningCount >= 1) {//Kill any running service
 			$shutdownAttempts = 0;
 			$done = false;
@@ -598,7 +636,7 @@ class NebSvcMonitor
 					'result'      => 'error',
 					'time'        => time()
 				];
-				$this->verboseLog($msg);
+				$this->verboseLog($msg, 'error');
 			} else {
 				$msg = 'Shutdown process completed. - ' . $this->nodeProcRunningCount;
 				$this->messages[] = [
@@ -607,25 +645,26 @@ class NebSvcMonitor
 					'result'      => 'error',
 					'time'        => time()
 				];
-				$this->verboseLog($msg);
+				$this->verboseLog($msg, 'error');
 				$this->nodeProcStatus = 'offline';
 
 			}
-		} else {//Start neb
-			$this->verboseLog('No processes running - starting neb');
+		}
+		if ($this->nodeProcStatus = 'offline') {
+			$this->verboseLog('No processes running - starting neb', 'info');
 			$restartAttempts = 0;
 			$done = false;
 			while ($done == false) {
 				$this->startNebProc();
 				$this->checkNodeProcRunning('count');
-				$this->verboseLog("startNebProc (a1): {$this->nodeProcRunningCount} | Restart Attempts: $restartAttempts");
+				$this->verboseLog("startNebProc (a1): {$this->nodeProcRunningCount} | Restart Attempts: $restartAttempts", 'info');
 				$restartAttempts++;
 				if ($this->nodeProcRunningCount == 1)
 					$done = true;
 				if ($restartAttempts >= $this->NSMSettings['maxRestartAttempts'])
 					$done = true;
 			}
-			$this->verboseLog('Exit Loop');
+			$this->verboseLog('Exit restart Loop', 'info');
 
 			if ($this->nodeProcRunningCount == 1) {
 				$this->nodeStatusRPC = 'online';
@@ -636,7 +675,7 @@ class NebSvcMonitor
 					'result'      => 'success',
 					'time'        => time()
 				];
-				$this->verboseLog($msg);
+				$this->verboseLog($msg, 'success');
 			} else {
 				$msg = 'neb process could not be started. Required attempts: ' . $restartAttempts;
 				$this->messages[] = [
@@ -645,7 +684,7 @@ class NebSvcMonitor
 					'result'      => 'success',
 					'time'        => time()
 				];
-				$this->verboseLog($msg);
+				$this->verboseLog($msg, 'success');
 			}
 		}
 		//Check RPC service
@@ -659,7 +698,7 @@ class NebSvcMonitor
 					'result'      => 'success',
 					'time'        => time()
 				];
-				$this->verboseLog($msg);
+				$this->verboseLog($msg, 'success');
 			} else {//offline
 				$msg = 'neb RPC process down.';
 				$this->messages[] = [
@@ -668,107 +707,9 @@ class NebSvcMonitor
 					'result'      => 'error',
 					'time'        => time()
 				];
-				$this->verboseLog($msg);
+				$this->verboseLog($msg, 'error');
 			}
 		}
-		/*do {
-
-	$this->startNebProc();
-	$this->checkNodeProcRunning('count');
-	$this->verboseLog("startNebProc (a1): {$this->nodeProcRunningCount} | Restart Attempts: $restartAttempts");
-	$restartAttempts++;
-
-} while ($this->nodeProcRunningCount == '1' || $restartAttempts >= $this->NSMSettings['maxRestartAttempts']);
-$this->verboseLog("Post");*/
-////////////////////////////////////////////////////
-		/*	if ($this->nodeProcRunningCount == 0) {
-				$this->verboseLog('No processes running - starting neb');
-
-				$restartAttempts = 0;
-				do {
-					$this->startNebProc();
-					$this->checkNodeProcRunning('count');
-					$restartAttempts++;
-				} while ($this->nodeProcRunningCount == 1 || $shutdownAttempts >= $this->NSMSettings['maxRestartAttempts']);
-				if ($this->nodeProcRunningCount == 1) {
-					$this->nodeStatusRPC = 'online';
-					$msg = 'neb process started. Retry attempts: ' . $restartAttempts;
-					$this->messages[] = [
-						'function'    => 'startNeb',
-						'messageRead' => $msg,
-						'result'      => 'success',
-						'time'        => time()
-					];
-					$this->verboseLog($msg);
-				} else {
-					$msg = 'neb process could not be started. Retry attempts: ' . $restartAttempts;
-					$this->messages[] = [
-						'function'    => 'startNeb',
-						'messageRead' => $msg,
-						'result'      => 'success',
-						'time'        => time()
-					];
-					$this->verboseLog($msg);
-				}
-			}
-			//////
-			$this->nodeStatusRPCCheck();
-			if ($this->nodeStatusRPC == 'online') {
-				$this->nodeStatusRPCCheck();
-			} else {
-				do {
-					$this->startNebProc();
-					$this->restartAttempts++;
-					if ($this->restartAttempts >= $this->NSMSettings['maxRestartAttempts']) {
-						$giveup = true;
-						$this->nodeRestart = false;
-						$msg = 'Restart failed - too many attempts: ' . $this->restartAttempts;
-						$this->messages[] = [
-							'function'    => 'startNeb',
-							'messageRead' => $msg,
-							'result'      => 'error',
-							'time'        => time()
-						];
-						$this->verboseLog($msg);
-					}
-					$this->killNebProc();
-
-				} while ($this->nodeStatusRPC == 'offline' || $giveup == true);
-				if ($this->nodeStatusRPC == 'offline')
-			}
-	///////////
-			$this->nodeStatusRPCCheck();
-			if ($this->nodeStatusRPC == 'offline') {
-				do {
-					$giveup = false;
-					$this->restartAttempts++;
-					$this->killNebProc();//Kill any in progress restart attempts just in case.
-					$this->startNeb();
-					if ($this->restartAttempts >= $this->NSMSettings['maxRestartAttempts']) {
-						$giveup = true;
-						$this->nodeRestart = false;
-						$msg = 'Restart failed - too many attempts: ' . $this->restartAttempts;
-						$this->messages[] = [
-							'function'    => 'startNeb',
-							'messageRead' => $msg,
-							'result'      => 'error',
-							'time'        => time()
-						];
-						$this->verboseLog($msg);
-					}
-				} while ($this->nodeRestart == true || $giveup == true);
-			} else {
-				$this->nodeRestart = false;
-				$this->nodeStatusRPC = 'online';
-				$msg = 'Neb is online. Restart attempts: ' . $this->restartAttempts;
-				$this->messages[] = [
-					'function'    => 'startNeb',
-					'messageRead' => $msg,
-					'result'      => 'startNebSuccess',
-					'time'        => time()
-				];
-				$this->verboseLog($msg);
-			}*/
 	}
 
 	private function getExternalAPIData($type = '/v1/user/nebstate')
@@ -788,7 +729,7 @@ $this->verboseLog("Post");*/
 				'result'      => 'info',
 				'time'        => time()
 			];
-			$this->verboseLog($msg);
+			$this->verboseLog($msg, 'info');
 		} else {
 			$msg = "Error obtaining API data from $externalURL";
 			$this->messages[] = [
@@ -798,7 +739,7 @@ $this->verboseLog("Post");*/
 				'time'        => time()
 			];
 			$this->externalNebState = null;
-			$this->verboseLog($msg);
+			$this->verboseLog($msg, 'error');
 		}
 	}
 
@@ -820,7 +761,7 @@ $this->verboseLog("Post");*/
 				'result'      => 'error',
 				'time'        => time()
 			];
-			$this->verboseLog($msg);
+			$this->verboseLog($msg, 'error');
 
 			$status = 'error';
 			$this->nodeStatusRPC = 'offline';
@@ -846,11 +787,11 @@ $this->verboseLog("Post");*/
 			$logMessage = print_r($this->localLogLatest, true);
 			if ($req == 'testEmail') {
 				//Send a test email
-				$message = 'Hello this is a requested test message from Nebulas node ' . $this->NSMSettings['nodeName'] . ' with the latest log included: 
+				$message = 'Hello this is a requested test message from Nebulas node ' . $this->NSMSettings['nodeName'] . ' with the latest log included with readable messages plus the full array result: 
 			
 			';
 			} else {
-				$message = 'Hello this is a message about Nebulas node ' . $this->NSMSettings['nodeName'] . '. It experienced a error and may require your attention. Below is the results from the NebSvcMonitor program running on the server.
+				$message = 'Hello this is a message about Nebulas node ' . $this->NSMSettings['nodeName'] . '. It experienced a error and may require your attention. Below is the results from the NebSvcMonitor program running on the server  with readable messages plus the full array result: .
             
             ';
 			}
@@ -859,7 +800,12 @@ $this->verboseLog("Post");*/
 				'Reply-To' => $this->NSMSettings['reportEmailFrom'],
 				'X-Mailer' => 'PHP/' . phpversion()
 			);
-			mail($to, $subject, $message . $logMessage, $headers);
+			mail($to, $subject,
+				$message .
+				$this->readableMessages .
+				"\n--------------------------\n" .
+				$logMessage,
+				$headers);
 		}
 	}
 
@@ -870,18 +816,20 @@ $this->verboseLog("Post");*/
 			unlink($this->NSMSettings['localDataFile']);
 		} else if ($req == 'writeInitial') {
 			$this->showStatus();
-			$this->localLogLatest[time()] = [//New data to add to the log
-			                                 'restartRequested'        => $this->nodeRestart,
-			                                 'restartAttempts'         => $this->restartAttempts,
-			                                 'nodeStatus'              => $this->nodeStatusRPC,
-			                                 'synchronized'            => $this->synchronized,
-			                                 'synchronizedBehindCount' => $this->synchronizedBehindCount,
-			                                 'blockHeight'             => $this->nodeBlockHeight,
-			                                 'serverHWUtilization'     => $this->serverHWUtilization,
-			                                 'reportTime'              => time(),
-			                                 'messageSeverityLevel'    => $this->severityMessageArray[$this->severityMessageMax],
-			                                 'ExternalAPIStatus'       => $this->externalNebState,
-			                                 'messages'                => $this->messages];
+			$time = time();
+			$this->localLogLatest[$time] = [//New data to add to the log
+			                                'restartRequested'        => $this->nodeRestartRequested,
+			                                'restartAttempts'         => $this->restartAttempts,
+			                                'repeatedRestartRequests' => $this->repeatedRestartRequests,
+			                                'nodeStatus'              => $this->nodeStatusRPC,
+			                                'synchronized'            => $this->synchronized,
+			                                'synchronizedBehindCount' => $this->synchronizedBehindCount,
+			                                'blockHeight'             => $this->nodeBlockHeight,
+			                                'serverHWUtilization'     => $this->serverHWUtilization,
+			                                'reportTime'              => $time,
+			                                'messageSeverityLevel'    => $this->severityMessageArray[$this->severityMessageMax],
+			                                'ExternalAPIStatus'       => $this->externalNebState,
+			                                'messages'                => $this->messages];
 			file_put_contents($this->NSMSettings['localDataFile'], json_encode($this->localLogLatest)); //Store the log
 			chmod($this->NSMSettings['localDataFile'], 0755);
 			$req = 'write';
@@ -903,8 +851,9 @@ $this->verboseLog("Post");*/
 		} else { //write to file
 			$this->maxLogSeverityNotice();
 			$this->localLogLatest[time()] = [//New data to add to the log
-			                                 'restartRequested'        => $this->nodeRestart,
+			                                 'restartRequested'        => $this->nodeRestartRequested,
 			                                 'restartAttempts'         => $this->restartAttempts,
+			                                 'repeatedRestartRequests' => $this->repeatedRestartRequests,
 			                                 'nodeStatus'              => $this->nodeStatusRPC,
 			                                 'synchronized'            => $this->synchronized,
 			                                 'synchronizedBehindCount' => $this->synchronizedBehindCount,
@@ -914,7 +863,7 @@ $this->verboseLog("Post");*/
 			                                 'ExternalAPIStatus'       => $this->externalNebState,
 			                                 'serverHWUtilization'     => $this->serverHWUtilization,
 			                                 'messages'                => $this->messages];
-			if ($this->localLogHistory)
+			if ($this->localLogHistory)//
 				$NewLog = $this->localLogLatest + $this->localLogHistory;
 			else
 				$NewLog = $this->localLogLatest;
@@ -935,11 +884,11 @@ $this->verboseLog("Post");*/
 		}
 	}
 
-	private function verboseLog($val)
+	private function verboseLog($val, $severity)
 	{//Primarily used for debugging - can be disabled in the config
 		$now = date("m j, Y, H:i:s");
+		$logEntry = $now . ' | ' . $severity . ' | ' . $this->logEchoNumber . ' | Message:' . $val . "\n";
 		if ($this->NSMSettings['verbose'] != false) {
-			$logEntry = $now . ': ' . $this->logEchoNumber . ' ' . $val . "\n";
 			$this->logEchoNumber++;
 			if ($this->NSMSettings['verbose'] == 'echo') {
 				echo $logEntry;
@@ -947,5 +896,19 @@ $this->verboseLog("Post");*/
 				file_put_contents($this->NSMSettings['verbose'], $logEntry, FILE_APPEND);
 			}
 		}
+		$this->readableMessages .= $logEntry;
+	}
+
+	private function cleanLogFile()
+	{
+		$currentLog = file_get_contents($this->NSMSettings['logName']);
+		$lineCount = substr_count($currentLog, "\n");
+		if ($lineCount > $this->NSMSettings['logMaxLines']) {
+			$linesToRemove = $lineCount - $this->NSMSettings['logMaxLines'];
+			echo "\nLine count: $lineCount | To remove: $linesToRemove\n";
+			$revisedLog = implode("\n", array_slice(explode("\n", $lineCount), $linesToRemove));
+			file_put_contents($this->NSMSettings['logName'], $revisedLog);
+		}
+		return null;
 	}
 }

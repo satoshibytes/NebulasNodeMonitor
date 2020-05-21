@@ -13,10 +13,10 @@
  * Note: The message will probably go to your spam folder so you must whitelist the email address with the from address
  * TODO Add additional features in the future such as website and telegram bot
  */
-$NSMSettings['reportToEmail'] = '';//Leave this empty to not have messages sent.
+$NSMSettings['reportToEmail'] = 'to@email.com';//Leave this empty to not have messages sent.
 
 //Where should we say the email came from?
-$NSMSettings['reportEmailFrom'] = '';
+$NSMSettings['reportEmailFrom'] = 'from@email.com';
 
 /*
  * Message logs can differ with the following levels:
@@ -27,7 +27,7 @@ $NSMSettings['reportEmailFrom'] = '';
 $NSMSettings['severityLevelMessageSend'] = '3';
 
 //What is the name of the node
-$NSMSettings['nodeName'] = 'Node-Name';
+$NSMSettings['nodeName'] = 'Your-Node-Name';
 
 //If the service is not found, should we restart the service?
 $NSMSettings['restartServiceIfNotFound'] = true; //true or false
@@ -40,7 +40,7 @@ $NSMSettings['enableRestartService'] = true;
 $NSMSettings['minFreeMemoryPercent'] = '15';
 
 //The minimum amount of free swap space available before triggering a error. For example if set to 20, the minimum amount of free ram must be 20%.
-$NSMSettings['minFreeSwapPercent'] = '20';
+$NSMSettings['minFreeSwapPercent'] = '15';
 
 //Max 5 minute load before triggering a error. Basically, max load should be under your core count. For example with 8 cores, this should be a max of 7 but is not set in stone. Can be a decimal such as 4.5   //todo implement improved features with cat /proc/cpuinfo
 $NSMSettings['restartMaxLoad5MinuteAvg'] = '3.5';
@@ -64,6 +64,11 @@ $NSMSettings['restartMinFreeSwapPercent'] = true;
 */
 $NSMSettings['nodeBehindRestartCount'] = 6;
 
+/*
+ * Set how many concurrent restart attempts should be performed. With the default of 3, the node will have to encounter an error 5 checks in a row before restarting. This is to stop continuous restart attempts every check. This is helpful for restart attempts due to performance issues(memory,cpu utilization). There is also a built in override to restart the node if it's found down regardless of this check
+ * This can also be set to 0 to restart on all restart requests.
+ */
+$NSMSettings['repeatedRestartRequests'] = 3;
 /*
  * If the node is not synced, how many blocks are acceptable per check to consider the node actively proceeding the sync process.
  * Note: If the node is being checked every 5 minutes(600 sec.), there would be about 20~ blocks generated in the cycle.
@@ -93,7 +98,7 @@ $NSMSettings['delayBetweenReports'] = 300; //Default 300;
 $NSMSettings['restartServiceIfMultipleProcFound'] = true; //true or false
 
 //How long in seconds to wait to verify the process restarted
-$NSMSettings['restartServiceDelayCheck'] = 12; //Default 30
+$NSMSettings['restartServiceDelayCheck'] = 10; //Default 30
 
 /*
  * What command to execute to restart the service? Be sure to use full directory location.
@@ -126,8 +131,17 @@ $NSMSettings['localDataFile'] = $NSMSettings['goNebulasDirectory'] . 'NebSvcMoni
 
 //How many events to store locally. This includes messages, block height, etc... in a JSON array.
 // Minimum is 1 so to check that block height is increasing.
-$NSMSettings['eventsToStoreLocally'] = 20;
+$NSMSettings['eventsToStoreLocally'] = 300;//Default is 300 - 288 is one days worth when being checked every 300 seconds
 
-//Display via echo or add to log entries.
-//$NSMSettings['verbose'] = $NSMSettings['goNebulasDirectory'] . 'NebSvcMonitor.log';//echo or logFile.log
+/*
+ * Display via echo or add to log entries.
+ * $NSMSettings['verbose'] = $NSMSettings['goNebulasDirectory'] . 'NebSvcMonitor.log';//echo or logFile.log
+ * Since the PHP script is executed via a bash script (for numerous reasons), it's best to keep this set to echo and by using the config recommended in the readme, the log is stored in the file "NebSvcMonitor.log"
+ */
 $NSMSettings['verbose'] = 'echo';//echo or logFile.log
+
+//Set max line count for the log - each run can as few at 5 lines to as many as 30+. Default is 1,000
+$NSMSettings['logMaxLines']='1000';
+
+//The name of the log file. Should match the same name as entered in the cron jobs and the 'NebSvcMonitor.sh' settings.
+$NSMSettings['logName']='NebSvcMonitor.log';
