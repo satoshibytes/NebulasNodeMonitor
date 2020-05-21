@@ -1,13 +1,17 @@
 <?php
 
 /*
- * This file stores the settings for the NebSvcMonitor.php script
+ * This file stores the settings for the NebSvcMonitor.php program
  * Simply set the config below for your specific needs
- * Required php to be installed on server (sudo apt install php7.3-cli)
- * Required curl (sudo apt install curl)
+ * Required php 7.3 and php7.3-curl (may work with older versions)to be installed on serve.
+ *      Example install: sudo apt install php7.3-cli php7.3-curl
+ * Depending on your environment, there may be additional steps to install PHP 7.3+
+ *
+ * Be sure to set your configuration in this file (NebulasServiceMonitorSettings.inc) as well as a few environment variables in the NebSvcMonitor.sh file.
+ *
+ *  Set the permission for the files NebSvcMonitor.sh and NebSvcMonitor.php via chmod +x NebSvcMonitor.sh && chmod +x NebSvcMonitor.php
  */
 
-//
 /*
  * Where should reports be sent?
  * Note: The message will probably go to your spam folder so you must whitelist the email address with the from address
@@ -113,13 +117,6 @@ $NSMSettings['selectedNetwork'] = 'mainnet'; //testnet or mainnet - is used to s
 //Get current block height from external source
 $NSMSettings['externalApiURL'] = 'https://' . $NSMSettings['selectedNetwork'] . '.nebulas.io';//'https://mainnet.nebulas.io';
 
-/*The startup command along with what config to use. Please note - due to how the nebulas service is designed, the full directory of your configuration file must be included. If you clone this file into a sub-directory of go-nebulas such as NebulasNodeMonitor if the repo is cloned, the following config would be used with the user neb executing nebulas.
- * Example:  /home/neb/go-nebulas/neb -c /home/neb/go-nebulas/mainnet/conf/config.conf
-*/
-$NSMSettings['nebStartServiceCommand'] = '/home/neb/go-nebulas/neb -c ' . $NSMSettings['selectedNetwork'] . '/conf/config.conf';
-//    /home/neb/go-nebulas/neb -c /home/neb/go-nebulas/mainnet/conf/config.conf
-//    /home/neb/go-nebulas/neb -c mainnet/conf/config.conf
-
 //How many times should we try to restart .neb before giving up.
 $NSMSettings['maxRestartAttempts'] = 5;
 
@@ -145,3 +142,12 @@ $NSMSettings['logMaxLines']='1000';
 
 //The name of the log file. Should match the same name as entered in the cron jobs and the 'NebSvcMonitor.sh' settings.
 $NSMSettings['logName']='NebSvcMonitor.log';
+
+//Stop here - UNUSED items below
+
+/*The startup command along with what config to use. Please note - due to how the nebulas service is designed, the full directory of your configuration file must be included. If you clone this file into a sub-directory of go-nebulas such as NebulasNodeMonitor if the repo is cloned, the following config would be used with the user neb executing nebulas.
+ * Example:  /home/neb/go-nebulas/neb -c /home/neb/go-nebulas/mainnet/conf/config.conf
+*/
+//$NSMSettings['nebStartServiceCommand'] = '/home/neb/go-nebulas/neb -c ' . $NSMSettings['selectedNetwork'] . '/conf/config.conf';
+//    /home/neb/go-nebulas/neb -c /home/neb/go-nebulas/mainnet/conf/config.conf
+//    /home/neb/go-nebulas/neb -c mainnet/conf/config.conf

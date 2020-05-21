@@ -3,20 +3,12 @@
  * This script was created to monitor the status of a Nebulas node.
  * It should work as-is on all modern Debian (Ubuntu, etc...) based systems (have not tested on RHEL (should work) or BSD (probably needs some modifications) as of yet).
  *
- * Be sure to set your configuration in the NebulasServiceMonitorSettings.inc file.
+ * Be sure to set your configuration in the NebulasServiceMonitorSettings.inc file and read all documentation within the file
  * Script requirements
- * ->Server must have PHP 7 (possibly 5.6) or later installed (apt install php-cli php-curl)
  * ->the file NebSvcMonitor.php and neb need to be owned by the same users (for some systems, it may be required to change who php runs as or give sudo access)//TODO check permission services
- * ->Server must have curl installed
- * ->chmod +x NebSvcMonitor.php
- * execution: php NebSvcMonitor.php REQ
- * ->php NebSvcMonitor.php stopNeb
- * ->php NebSvcMonitor.php startNeb
- * ->php NebSvcMonitor.php status
- *
- * //TODO manage log size (either rotate or concat)
- *
- *
+ * ->chmod +x NebSvcMonitor.php && chmod +x NebSvcMonitor.sh
+ * execution: php NebSvcMonitor.php
+ * By running "php NebSvcMonitor.php help" you can see a list of available commands
  */
 
 if (isset($argv[1])) { //&& $argv[2] == 'fromBash'
@@ -36,7 +28,7 @@ $NebulasServiceMonitor = new NebSvcMonitor($NSMSettings);
 $NebulasServiceMonitor->doProcess($doProcess);
 
 class NebSvcMonitor
-{// extends NSMSettings
+{
 	//Define initial variables
 	private $nodeRestartRequested = false; //does the node need to be restarted - set initial to false
 	private $emergencyRestart = false;
@@ -49,12 +41,10 @@ class NebSvcMonitor
 	private $nodeProcStatus; //The status of the nodes process id - can be live, killed, zombie
 	private $synchronized; //Current sync status - can be true or false
 	private $nodeBlockHeight; //Current node block height
-	//   private $serverLoad; //Current server load stats as array
 	private $serverHWUtilization; //Current server hardware utilization as array
 	private $localLogHistory; //Store the local log in a array
 	private $localLogLastCall; //Store the local log in a array
 	private $synchronizedBehindCount; //Variable to store how long a node has been behind
-	private $synchronizedBehindCountIncreased; //Watch for double increments
 	private $externalNebState; //Store the nebstate from external API
 	private $localLogLatest;//
 	private $severityMessageArray = [0 => 'success', 1 => 'info', 2 => 'notify', 3 => 'warn', 4 => 'error'];
@@ -62,8 +52,11 @@ class NebSvcMonitor
 	private $NSMSettings;//Settings storage
 	private $logEchoNumber = 1;
 	private $nodeProcRunningCount;
+	//private $synchronizedBehindCountIncreased; //Watch for double increments
+	//   private $serverLoad; //Current server load stats as array
+
 	public $about = [//About
-	                 'version'            => '0.1',
+	                 'version'            => '0.9 (beta)',
 	                 'name'               => 'Nebulas Service Monitor',
 	                 'creator'            => '@SatoshiBytes',
 	                 'warning'            => 'Work in progress and experimental - do not use on a live node server',
@@ -135,11 +128,11 @@ class NebSvcMonitor
 				print_r($this->about);
 				break;
 		}
-		$this->cleanLogFile();
+		$this->cleanLogFile();//Check if the log file is too big and remove old entries (size is set in the config)
 	}
 
-	private function statusCheck()
-	{//This is the primary status checker and restart function
+	private function statusCheck()//This is the primary status checker and restart function
+	{
 		/*
 		 * Steps:
 		 * 1) Check to see if there is a response from the node
@@ -180,7 +173,7 @@ class NebSvcMonitor
 		$this->verboseLog("Node synced:{$this->synchronized}\nBlock Height: {$this->nodeBlockHeight}\nNode Status: {$this->nodeStatusRPC}\nExternal API Block Height: {$this->externalNebState['result']['height']}\nExternal API Synced: {$this->externalNebState['result']['synchronized']}", 'info');
 
 		if ($this->nodeStatusRPC == 'online') { //Node is running //TODO verify this entire section
-			$externalNebStateBlockHeight = $this->externalNebState['result']['height'];
+			//$externalNebStateBlockHeight = $this->externalNebState['result']['height'];
 			$externalNebStateSynchronized = $this->externalNebState['result']['synchronized'];
 			if ($this->synchronized == true) { //Node is online. Check server utilization
 				//Compare block height to the api should be within 1 block of one another (due to short block gen timing).
@@ -247,7 +240,7 @@ class NebSvcMonitor
 						if ($this->nodeBlockHeight < $blockHeightIncreaseCount) {
 							//Block height increasing too slowly
 							$msg = "Block height increasing too slowly.";
-							$syncAtProperRate = false;
+							//$syncAtProperRate = false;
 							$this->messages[] = [
 								'function'    => 'statusCheck',
 								'messageRead' => $msg,
@@ -257,7 +250,7 @@ class NebSvcMonitor
 						} else {
 							//Block height is increasing fast enough
 							$msg = "Block height increasing at proper rate.";
-							$syncAtProperRate = true;
+							//$syncAtProperRate = true;
 							$this->messages[] = [
 								'function'    => 'statusCheck',
 								'messageRead' => $msg,
@@ -357,8 +350,8 @@ class NebSvcMonitor
 		}
 	}
 
-	private function showStatus()
-	{//Show the status of the node when called
+	private function showStatus()//Show the status of the node when called
+	{
 		$this->verboseLog("## ENTER checkNodeProcRunning ##", 'info');
 		$this->checkNodeProcRunning();
 		$this->verboseLog("## ENTER serverStatus ##", 'info');
@@ -369,8 +362,9 @@ class NebSvcMonitor
 		$this->getExternalAPIData();
 	}
 
-	private function serverStatus()
-	{//Check the server hardware utilization. //TODO add more checks such as storage space
+	private function serverStatus()//Check the server hardware utilization.
+	{
+		//TODO add more checks such as storage space
 		//Check the cpu utilization
 		$loadRaw = sys_getloadavg();
 		$loadMessage = "1 minute: {$loadRaw[0]} | 5 minutes: {$loadRaw[1]} | 15 minutes: {$loadRaw[2]}";
@@ -378,6 +372,7 @@ class NebSvcMonitor
 		                                     'avgLoad5min'  => $loadRaw[1],
 		                                     'avgLoad15min' => $loadRaw[2]];
 		if ($loadRaw[1] > $this->NSMSettings['restartMaxLoad5MinuteAvg']) {//Exceeded 5 min load average
+			$messageExtended = '';
 			if ($this->NSMSettings['restartIfMaxLoadExceeded']) {
 				$this->nodeRestartRequested = true;
 				$messageExtended = " Node will reboot based on config settings";
@@ -428,6 +423,7 @@ class NebSvcMonitor
 		                                        'totalSwap'         => $memoryUsageDataArray['totalSwap'],
 		                                        'freeSwapPercent'   => $freeSwapPercent];
 		if ($freeMemoryPercent < $this->NSMSettings['minFreeMemoryPercent']) {//Exceeded free ram
+			$messageExtended = '';
 			if ($this->NSMSettings['restartMinFreeMemoryPercent'] == true) {
 				$this->nodeRestartRequested = true;
 				$messageExtended = " Node will reboot based on config settings";
@@ -442,6 +438,7 @@ class NebSvcMonitor
 			$this->verboseLog($msg, 'error');
 		}
 		if ($freeSwapPercent < $this->NSMSettings['minFreeSwapPercent']) {//Exceeded free ram
+			$messageExtended = '';
 			if ($this->NSMSettings['restartMinFreeSwapPercent'] == true) {
 				$this->nodeRestartRequested = true;
 				$messageExtended = " Node will reboot based on config settings";
@@ -589,14 +586,6 @@ class NebSvcMonitor
 		return null;
 	}
 
-	private function setEnvVariables()
-	{//Currently not used.
-		$currentDir = $exec = exec('echo $PWD');
-		//exec("export LD_LIBRARY_PATH=$currentDir/native-lib:\$LD_LIBRARY_PATH");//Set evn variables for .neb - not needed for all systems but safe than sorry.
-		//exec('export LD_LIBRARY_PATH');
-		//exec(' source $HOME/.bashrc');
-		//$this->verboseLog("completed putenv");
-	}
 
 	private function startNebProc()
 	{
@@ -910,5 +899,14 @@ class NebSvcMonitor
 			file_put_contents($this->NSMSettings['logName'], $revisedLog);
 		}
 		return null;
+	}
+
+	private function setEnvVariables()//Currently not used.
+	{
+		//$currentDir = $exec = exec('echo $PWD');
+		//exec("export LD_LIBRARY_PATH=$currentDir/native-lib:\$LD_LIBRARY_PATH");//Set evn variables for .neb - not needed for all systems but safe than sorry.
+		//exec('export LD_LIBRARY_PATH');
+		//exec(' source $HOME/.bashrc');
+		//$this->verboseLog("completed putenv");
 	}
 }

@@ -1,20 +1,22 @@
 #!/bin/sh
 
 #Execution options:
-# ./NebSvcMonitor.sh > /dev/null &
-#   No logs stored
-# ./NebSvcMonitor.sh >> NebSvcMonLog_sh.log &
-#   Logs stored on server within the go-nebulas directory with the name NebSvcMonLog_sh.log
+## Start the program without storing additional logs:
+#  ./NebSvcMonitor.sh > /dev/null &
+#
+#   ## Start the program and store logs:
+#  ./NebSvcMonitor.sh >> NebSvcMonitor.log &
+#   Logs stored on server within the go-nebulas directory with the name NebSvcMonitor.log
 
 ##Config section
-#set the home directory
+#set the home directory - change "neb" to the user that owns neb (root is acceptable)
 . /home/neb/.bashrc
 
 #Set the go-nebulas directory with no trailing slash
 goNebulasDir=/home/neb/go-nebulas
 
 #Set the config file to use
-nebConfigFile=testnet/conf/config.conf
+nebConfigFile=mainnet/conf/config.conf
 
 #Set how often the status of .neb should be checked in seconds (default is 300, every 5 minutes).
 #This must also match the setting in the NebSvcMonitorSettings.inc config file for the variable $NSMSettings['delayBetweenReports']
