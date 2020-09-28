@@ -26,7 +26,7 @@ Thus far, testing has been via a Debian based server running PHP 7.2. It should 
     * For example, Debian based systems can istall PHP via sudo user with the command __sudo apt install php7.2-cli php7.2-curl__
 * Clone or copy this repo into your go-nebulas directory: From your go-nebulas directory: __git clone https://github.com/satoshibytes/NebulasNodeMonitor.git__
 * You should have a new directory named "NebulasNodeMonitor". Enter the directory via __cd NebulasNodeMonitor__
-* Review and edit the settings stored in the file __NSMSettings.inc__ and adjust accordingly to your requirements. The document is comment and should be easy to edit.
+* Review and edit the settings stored in the file __NebSvcMonitorSettings.inc__ and adjust accordingly to your requirements. The document is comment and should be easy to edit.
 * Review and edit the settings stored in the file NebSvcMonitor.sh then setup the required symbolic links by entering __./NebSvcMonitor.sh install__
     * Check and fix any errors then return to the go-nebulas directory. From there, enter __./NebSvcMonitor.sh__ and it will remain active checking your node.
     * The timing of node verification can also be set within this file and must match the setting (in seconds) within the __NebSvcMonitorSettings.inc__ file for proper operation.
@@ -50,7 +50,8 @@ This program is a work in progress and is being in testing on a live node. Test 
 _The last item that needs work for the moment is making the messages being sent out to email easier to read._
 
 ### How to test ### 
-If testing, you can set the option __$NSMSettings['enableRestartService']__ to false in the _NebSvcMonitorSettings.inc_ file. With it set to false, the service will run and send out emails but not intervene with operations.
+If testing, you can set the option __$NSMSettings['enableRestartService']__ to false in the _
+_ file. With it set to false, the service will run and send out emails but not intervene with operations.
 
 If used in a live environment, you can set the option to disable server restarts so it will only observe the system and send notification - it will not intervene with operation.
 
