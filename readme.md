@@ -16,14 +16,14 @@ A service tool to monitor the status of a Nebulas.io node and intervene (e.g. re
 __Settings must be configured via the commented NebSvcMonitorSettings.inc file.__
 
 ## Requirements ##
-* The server must have php7.2-cli and php-curl installed.
+* The server must have php7.3-cli and php-curl installed.
 * The status is checked via a shell script every 5 minutes (Can be changed).
 * The files must be the same user as the neb file so it can start and stop the program.
 
 ## Installation ##
-Thus far, testing has been via a Debian based server running PHP 7.2. It should work with other base operating systems as well such as Ubuntu (based on Debian) and CentOS.
-* Installation of PHP 7.2-cli and PHP-CURL. This can vary based on system and package manager. 
-    * For example, Debian based systems can istall PHP via sudo user with the command __sudo apt install php7.2-cli php7.2-curl__
+Thus far, testing has been via a Debian based server running PHP 7.3. It should work with other base operating systems as well such as Ubuntu (based on Debian) and CentOS.
+* Installation of PHP 7.3-cli and PHP-CURL. This can vary based on system and package manager. 
+    * For example, Debian based systems can istall PHP via sudo user with the command __sudo apt install php7.3-cli php7.3-curl__
 * Clone or copy this repo into your go-nebulas directory: From your go-nebulas directory: __git clone https://github.com/satoshibytes/NebulasNodeMonitor.git__
 * You should have a new directory named "NebulasNodeMonitor". Enter the directory via __cd NebulasNodeMonitor__
 * Review and edit the settings stored in the file __NebSvcMonitorSettings.inc__ and adjust accordingly to your requirements. The document is comment and should be easy to edit.
