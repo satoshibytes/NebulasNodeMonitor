@@ -1,5 +1,5 @@
 # Nebulas Blockchain Node Monitor #
-A service tool to monitor the status of a Nebulas.io node and intervene (e.g. restart, notify admin) if necessary. It is currently in a beta phase of development with all current features functioning but requires further testing on other systems. For testing, see __How to test__ below.
+A service tool to monitor the status of a Nebulas.io node and intervene (e.g. restart, notify admin) if necessary. It is currently in a beta phase of development with all current features functioning and currently operating on multiple independent servers (both bare metal and VM/LXC). For testing, see __How to test__ below.
 
 ## Service monitor features (currently available) ##
 * Verifies the node is running;
@@ -45,7 +45,7 @@ _Note: /path/to/go-nebulas/ must be the actual path to your go-nebulas install. 
 * Simpler installer.
 
 ## This is still a work in progress ##
-This program is a work in progress and is being in testing on a live node. Test in a live environment at your own risk - see below __How to test__.
+This program is a work in progress and is being in testing on live nodes. Test in a live environment at your own risk - see below __How to test__.
 
 _The last item that needs work for the moment is making the messages being sent out to email easier to read._
 
@@ -54,6 +54,8 @@ If testing, you can set the option __$NSMSettings['enableRestartService']__ to f
 _ file. With it set to false, the service will run and send out emails but not intervene with operations.
 
 If used in a live environment, you can set the option to disable server restarts so it will only observe the system and send notification - it will not intervene with operation.
+
+It's important that the permissions/owners of the neb binary and this programs files match or have proper pemissions.
 
 ### Bug report ###
 When submitting a bug report, be sure to include the full error, last log entries (be sure there is no private information included such as node name), operating system/version and PHP version (check with php -v). 
