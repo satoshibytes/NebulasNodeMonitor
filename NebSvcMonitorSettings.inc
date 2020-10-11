@@ -44,7 +44,8 @@ $NSMSettings['enableRestartService'] = true;
 $NSMSettings['minFreeMemoryPercent'] = '15';
 
 //The minimum amount of free swap space available before triggering a error. For example if set to 20, the minimum amount of free ram must be 20%.
-$NSMSettings['minFreeSwapPercent'] = '15';
+//NOTE: After sinifigent testing, it seems that the neb binary has a memory leak and once there is limited RAM, the node begins to suffer errors. I suggest setting this to 30% for the time being.
+$NSMSettings['minFreeSwapPercent'] = '30';
 
 //Max 5 minute load before triggering a error. Basically, max load should be under your core count. For example with 8 cores, this should be a max of 7 but is not set in stone. Can be a decimal such as 4.5   //todo implement improved features with cat /proc/cpuinfo
 $NSMSettings['restartMaxLoad5MinuteAvg'] = '3.5';
