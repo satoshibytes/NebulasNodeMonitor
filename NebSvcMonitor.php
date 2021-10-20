@@ -333,6 +333,7 @@ class NebSvcMonitor
 		if ($this->performNodeRestart == true || $this->emergencyRestart == true) { //nodeProcId found no running neb functions - restart the service
 			if ($this->NSMSettings['enableRestartService'] == true)
 				$this->startNeb();//Start neb
+				sleep(10);
 			else {
 				$msg = "The NebSvcMonitor found the node to require restarting however, it is set to not restart in the config (enableRestartService).";
 				$this->messages[] = [
